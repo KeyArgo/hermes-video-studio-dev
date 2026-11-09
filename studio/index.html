@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Studio</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div id="app">
+  <aside id="rail">
+    <div class="brand"><span class="brand-mark">▣</span> <b>Hewn</b> <span class="brand-dim">Video Studio</span></div>
+    <div class="rail-label">Films</div>
+    <div id="films" class="films"></div>
+    <div class="rail-foot" id="rail-foot"></div>
+  </aside>
+
+  <main id="stage">
+    <header id="stage-head">
+      <div class="title-block">
+        <h1 id="film-title">Loading…</h1>
+        <div class="sub" id="film-sub"></div>
+      </div>
+      <div class="actions">
+        <button id="btn-gate" class="btn">Run gate</button>
+        <button id="btn-render" class="btn btn-primary">Render film</button>
+      </div>
+    </header>
+
+    <div id="player-wrap">
+      <video id="player" controls playsinline></video>
+      <div id="player-empty" class="empty">No render yet. Edit a shot, then render the film.</div>
+    </div>
+
+    <div id="timeline">
+      <div id="beats" class="beats"></div>
+    </div>
+
+    <div id="status-bar"><span id="status-text">Ready</span></div>
+  </main>
+
+  <aside id="inspector">
+    <section class="panel">
+      <div class="panel-label">Gate</div>
+      <div id="gate-body" class="gate-body">
+        <p class="hint">Hook, motion and legibility on the latest render. A film only ships when all three pass.</p>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-label">Render</div>
+      <div id="render-body" class="render-body"><p class="hint">Nothing rendering.</p></div>
+    </section>
+    <section class="panel grow">
+      <div class="panel-label">Shot <span id="shot-name" class="mono-dim"></span></div>
+      <div id="shot-body" class="shot-body"><p class="hint">Pick Edit on a shot to inspect its composition.</p></div>
+    </section>
+  </aside>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
