@@ -1,0 +1,28 @@
+<template>
+<style>
+  #root{position:absolute;inset:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-ui);display:flex;align-items:center;justify-content:center;}
+  #inner{text-align:left;}
+  #name{font-size:72px;font-weight:700;margin-bottom:48px;}
+  #install{font-family:var(--font-mono);font-size:56px;color:var(--ink);background:#14171b;border:2px solid #2a2e34;border-radius:14px;padding:36px 48px;white-space:nowrap;}
+  #caret{display:inline-block;width:4px;height:52px;background:var(--accent);vertical-align:middle;margin-left:8px;}
+  #foot{margin-top:44px;font-size:34px;color:var(--dim);font-family:var(--font-mono);letter-spacing:.08em;}
+</style>
+<div id="root" data-composition-id="shot-end" data-width="1920" data-height="1080">
+  <div id="inner">
+    <div id="name">Game Center</div>
+    <div id="install">$ hermes plugins install hermes-gameshelf<span id="caret"></span></div>
+    <div id="foot">Plugin Hackathon · Nov 2026</div>
+  </div>
+</div>
+<script>
+(function(){
+  const tl=gsap.timeline({paused:true});
+  tl.from('#name',{opacity:.2,y:-30,duration:.5,ease:'power2.out'},0);
+  tl.from('#install',{opacity:.2,y:30,duration:.5,ease:'power2.out'},.1);
+  tl.from('#foot',{opacity:.2,duration:.5,ease:'power1.out'},.3);
+  tl.fromTo('#caret',{opacity:1},{opacity:0,duration:.55,repeat:16,yoyo:true,ease:'steps(1)'},.6);
+  tl.fromTo('#root',{scale:1},{scale:1.03,duration:10,ease:'none'},0);
+  window.__timelines=window.__timelines||{};window.__timelines['shot-end']=tl;
+})();
+</script>
+</template>

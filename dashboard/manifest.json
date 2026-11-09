@@ -1,0 +1,12 @@
+{
+  "name": "hewn-video-studio",
+  "label": "Video Studio",
+  "version": "0.2.0",
+  "tab": {
+    "path": "/video-studio",
+    "position": "end",
+    "hidden": false
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}

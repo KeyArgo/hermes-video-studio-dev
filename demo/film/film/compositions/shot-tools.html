@@ -1,0 +1,32 @@
+<template>
+<style>
+  #root{position:absolute;inset:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-ui);}
+  #headline{position:absolute;left:120px;top:180px;font-size:104px;font-weight:700;}
+  #rule{position:absolute;left:122px;top:330px;height:6px;width:0;background:var(--accent);border-radius:3px;}
+  #chips{position:absolute;left:120px;top:420px;width:1100px;}
+  .chip{display:flex;align-items:center;margin-bottom:44px;padding:26px 40px;border:2px solid #2a2e34;border-radius:14px;background:#14171b;font-family:var(--font-mono);font-size:38px;}
+  .chip .dot{width:16px;height:16px;border-radius:50%;background:var(--accent);margin-right:28px;}
+  .chip .desc{margin-left:auto;color:var(--dim);font-family:var(--font-ui);font-size:34px;}
+</style>
+<div id="root" data-composition-id="shot-tools" data-width="1920" data-height="1080">
+  <div id="headline">One plugin. Four tools.</div>
+  <div id="rule"></div>
+  <div id="chips">
+    <div class="chip"><span class="dot"></span>games_play<span class="desc">make a move</span></div>
+    <div class="chip"><span class="dot"></span>games_state<span class="desc">read the board</span></div>
+    <div class="chip"><span class="dot"></span>games_referee<span class="desc">check legality</span></div>
+    <div class="chip"><span class="dot"></span>games_chat<span class="desc">table talk</span></div>
+  </div>
+</div>
+<script>
+(function(){
+  const tl=gsap.timeline({paused:true});
+  tl.from('#headline',{opacity:.2,y:40,duration:.5,ease:'power2.out'},0);
+  tl.fromTo('#rule',{width:0},{width:520,duration:.9,ease:'power2.out'},.2);
+  tl.from('.chip',{opacity:.2,x:-60,duration:.5,stagger:.18,ease:'power2.out'},.4);
+  tl.fromTo('#root',{scale:1},{scale:1.04,duration:9,ease:'none'},0);
+  tl.to('.chip .dot',{scale:1.25,duration:1,stagger:.18,yoyo:true,repeat:1,ease:'power1.inOut'},2);
+  window.__timelines=window.__timelines||{};window.__timelines['shot-tools']=tl;
+})();
+</script>
+</template>

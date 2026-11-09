@@ -1,0 +1,47 @@
+<template>
+<style>
+  #root{position:absolute;inset:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-ui);}
+  #bgwrap{position:absolute;inset:-120px;}
+  #bgpattern{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);opacity:.07;}
+  .bsq{border:1px solid var(--ink);}
+  #textblock{position:absolute;left:120px;top:280px;width:1560px;will-change:transform;}
+  #label{font-family:var(--font-mono);font-size:34px;letter-spacing:.24em;color:var(--dim);margin-bottom:36px;}
+  #line{font-size:96px;line-height:1.18;font-weight:700;}
+  #line .l{display:block;overflow:hidden;}
+  #line .li{display:block;}
+  .acc{position:relative;color:var(--accent);}
+  #rule{position:absolute;left:0;bottom:-10px;height:4px;width:100%;background:var(--accent);transform:scaleX(0);transform-origin:left center;}
+</style>
+<div id="root" data-composition-id="shot-limit" data-width="1920" data-height="1080">
+  <div id="bgwrap"><div id="bgpattern"></div></div>
+  <div id="textblock">
+    <div id="label">LIMIT</div>
+    <div id="line">
+      <span class="l"><span class="li" data-line>You cannot invite a <span class="acc">named friend<span id="rule"></span></span></span></span>
+      <span class="l"><span class="li" data-line>into a closed table.</span></span>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const p=document.getElementById('bgpattern');
+  for(let i=0;i<64;i++){const d=document.createElement('div');d.className='bsq';p.appendChild(d);}
+  const tl=gsap.timeline({paused:true});
+
+  // 1. background drift, linear, full 8s
+  tl.fromTo('#bgwrap',{x:0,y:0},{x:-60,y:-60,duration:8,ease:'none'},0);
+
+  // 2. slow scale push on text block, full 8s
+  tl.fromTo('#textblock',{scale:1},{scale:1.05,duration:8,ease:'none'},0);
+
+  // 3. entry in first 600ms: label then headline lines rising 24px, staggered
+  tl.from('#label',{opacity:0,y:24,duration:.35,ease:'power2.out'},0);
+  tl.from('[data-line]',{opacity:0,y:24,duration:.45,ease:'power2.out',stagger:.12},.12);
+
+  // 4. accent rule sweep under "named friend", 1.2s -> 2.0s
+  tl.fromTo('#rule',{scaleX:0},{scaleX:1,duration:.8,ease:'power2.inOut'},1.2);
+
+  window.__timelines=window.__timelines||{};window.__timelines['shot-limit']=tl;
+})();
+</script>
+</template>

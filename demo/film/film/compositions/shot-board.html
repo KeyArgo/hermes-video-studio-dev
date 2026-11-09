@@ -1,0 +1,43 @@
+<template>
+<style>
+  #root{position:absolute;inset:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-ui);}
+  #boardWrap{position:absolute;right:-140px;top:-60px;width:1300px;height:1300px;}
+  #board{width:1200px;height:1200px;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:8px solid #2a2e34;border-radius:10px;box-shadow:0 40px 90px rgba(0,0,0,.55);}
+  .sq{display:flex;align-items:center;justify-content:center;font-size:96px;color:var(--ink);}
+  .light{background:#1c2026;}
+  .dark{background:#2e343c;}
+  #meta{position:absolute;left:90px;top:420px;}
+  #move{font-family:var(--font-mono);font-size:40px;color:var(--ink);margin-bottom:28px;}
+  #badge{display:inline-block;font-family:var(--font-mono);font-size:34px;color:#0b0d10;background:var(--accent);padding:10px 28px;border-radius:8px;letter-spacing:.1em;}
+  #label{position:absolute;left:90px;top:340px;font-family:var(--font-mono);font-size:34px;color:var(--dim);letter-spacing:.18em;}
+</style>
+<div id="root" data-composition-id="shot-board" data-width="1920" data-height="1080">
+  <div id="boardWrap"><div id="board"></div></div>
+  <div id="label">MOVE LOG</div>
+  <div id="meta">
+    <div id="move">Move 14 · knight to f6</div>
+    <div id="badge">LEGAL</div>
+  </div>
+</div>
+<script>
+(function(){
+  const b=document.getElementById('board');
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const d=document.createElement('div');d.className='sq '+(((r+c)%2)?'dark':'light');
+    b.appendChild(d);
+  }
+  const sq=(r,c)=>b.children[r*8+c];
+  sq(6,5).textContent='♞';sq(1,4).textContent='♚';sq(0,3).textContent='♛';sq(7,6).textContent='♟';
+  const tl=gsap.timeline({paused:true});
+  tl.from('#label',{opacity:.2,x:-30,duration:.5,ease:'power2.out'},0);
+  tl.from('#move',{opacity:.2,x:-40,duration:.5,ease:'power2.out'},.1);
+  tl.from('#badge',{opacity:.2,scale:.8,duration:.5,ease:'back.out(2)'},.25);
+  tl.fromTo('#boardWrap',{scale:1,x:0,y:0},{scale:1.12,x:-90,y:-60,duration:11,ease:'none'},0);
+  tl.fromTo(sq(6,5),{y:0},{y:-190,duration:1.2,ease:'power2.inOut'},4.5);
+  tl.set(sq(6,5),{textContent:'♟'},5.7);
+  tl.fromTo(sq(3,2),{opacity:0,scale:.4},{opacity:1,scale:1,duration:.6,ease:'back.out(2)'},5.7);
+  tl.to('#badge',{scale:1.08,duration:.3,yoyo:true,repeat:1,ease:'power1.inOut'},5.8);
+  window.__timelines=window.__timelines||{};window.__timelines['shot-board']=tl;
+})();
+</script>
+</template>

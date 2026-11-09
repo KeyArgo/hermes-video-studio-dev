@@ -1,0 +1,37 @@
+<template>
+<style>
+  #root{position:absolute;inset:0;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font-ui);}
+  #kicker{position:absolute;top:80px;left:90px;font-family:var(--font-mono);font-size:34px;letter-spacing:.18em;color:var(--dim);}
+  #headline{position:absolute;top:190px;left:90px;width:900px;font-size:104px;line-height:1.08;font-weight:700;}
+  #headline .acc{color:var(--accent);}
+  #boardWrap{position:absolute;right:120px;top:200px;width:640px;height:640px;perspective:1200px;}
+  #board{width:560px;height:560px;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:6px solid #2a2e34;border-radius:8px;box-shadow:0 40px 80px rgba(0,0,0,.5);}
+  .sq{display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--ink);}
+  .light{background:#1c2026;}
+  .dark{background:#2e343c;}
+</style>
+<div id="root" data-composition-id="shot-hero" data-width="1920" data-height="1080">
+  <div id="kicker">GAME CENTER</div>
+  <div id="headline">Ten games the agent can actually <span class="acc">play.</span></div>
+  <div id="boardWrap"><div id="board"></div></div>
+</div>
+<script>
+(function(){
+  const b=document.getElementById('board');
+  const glyphs=['♜','♞','♝','♛','♚','♝','♞','♜','♟','♟','♟','♟','♟','♟','♟','♟'];
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const d=document.createElement('div');d.className='sq '+(((r+c)%2)?'dark':'light');
+    if(r<2)d.textContent=glyphs[r*8+c];
+    if(r>5)d.textContent=glyphs[(7-r)*8+c];
+    b.appendChild(d);
+  }
+  const tl=gsap.timeline({paused:true});
+  tl.from('#kicker',{opacity:.2,x:-30,duration:.5,ease:'power2.out'},0);
+  tl.from('#headline',{opacity:.2,y:40,duration:.6,ease:'power2.out'},.1);
+  tl.fromTo('#boardWrap',{x:260,y:260,opacity:.4},{x:0,y:0,opacity:1,duration:.6,ease:'power3.out'},0);
+  tl.fromTo('#board',{rotateX:14,rotateY:-10,scale:1},{rotateX:8,rotateY:-6,scale:1.06,duration:7,ease:'none'},0);
+  tl.to('#root',{scale:1.02,duration:7,ease:'none'},0);
+  window.__timelines=window.__timelines||{};window.__timelines['shot-hero']=tl;
+})();
+</script>
+</template>

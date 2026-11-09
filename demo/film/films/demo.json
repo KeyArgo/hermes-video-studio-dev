@@ -1,0 +1,32 @@
+{
+  "title": "Game Center",
+  "width": 1920,
+  "height": 1080,
+  "beats": [
+    {
+      "id": "hero",
+      "src": "./compositions/shot-hero.html",
+      "duration": 7.0
+    },
+    {
+      "id": "board",
+      "src": "./compositions/shot-board.html",
+      "duration": 11.0
+    },
+    {
+      "id": "tools",
+      "src": "./compositions/shot-tools.html",
+      "duration": 9.0
+    },
+    {
+      "id": "limit",
+      "src": "./compositions/shot-limit.html",
+      "duration": 8.0
+    },
+    {
+      "id": "end",
+      "src": "./compositions/shot-end.html",
+      "duration": 10.0
+    }
+  ]
+}
