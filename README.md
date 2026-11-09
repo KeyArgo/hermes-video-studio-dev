@@ -26,12 +26,37 @@ so replay never touches ffmpeg.
 ## Install
 
 ```bash
-cp -r ~/Development/hewn-cut ~/.hermes/plugins/hewn-cut
-hermes plugins validate ~/.hermes/plugins/hewn-cut
-hermes plugins enable hewn-cut          # tools load on the next session
+hermes plugins install <git-url-or-owner/repo>   # or: cp -r . ~/.hermes/plugins/hewn-video-studio
+hermes plugins validate hewn-video-studio
+hermes plugins enable hewn-video-studio          # tools and the tab load on the next session
 ```
 
-The agent then has one tool, `video_cut`.
+The agent then has one tool, `video_studio`, and the dashboard gets a **Video Studio**
+tab with two rooms.
+
+Needs `ffmpeg` on PATH. The **Films** room additionally runs [HyperFrames]
+(`npx hyperframes`, node >= 22, fetched on first render) against a motion workspace —
+`$VIDEO_STUDIO_MOTION`, else `~/Development/hewn-motion`, else the bundled demo film, so
+the room is never empty on a fresh install.
+
+### Films room
+
+A film is `films/<id>.json`: an ordered list of beats, each pointing at one HTML shot
+composition. In the tab you get a card per shot (duration, rendered or not), **Edit**
+to change that shot's HTML, **Re-render** for that shot alone (a 7 s shot takes ~31 s at
+draft quality), **Render film** with live job progress, and **Gate** — the same
+hook/motion/legibility checks the CLI gate runs, returned as data.
+
+```
+GET  /films                     list films + renders
+GET  /films/{id}                beats, shot existence, renders
+GET  /films/{id}/beats/{b}/source   PUT ... (source must keep data-composition-id)
+POST /films/{id}/beats/{b}/render   one shot -> renders/shots/{b}.mp4
+POST /films/{id}/render            build index + full render (job id)
+GET  /jobs/{id}                 state, seconds, log tail
+POST /films/{id}/gate            hook / motion / legibility on the latest render
+GET  /films/{id}/video          the latest mp4
+```
 
 ## The loop
 
