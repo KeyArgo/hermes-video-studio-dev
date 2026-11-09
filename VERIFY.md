@@ -30,17 +30,20 @@ than an opinion.
 ## Films (HyperFrames room)
 
 ```bash
-curl -s localhost:8756/api/plugins/hewn-video-studio/films | python3 -m json.tool | head
+python3 - <<'PY'
+import json, urllib.request
+base = "http://127.0.0.1:8756/api/plugins/hewn-video-studio"
+def get(path, method="GET"):
+    req = urllib.request.Request(base + path, method=method)
+    with urllib.request.urlopen(req, timeout=600) as r:
+        return json.load(r)
+films = get("/films")
+print("films:", [f["id"] for f in films["films"]], "workspace:", films["workspace"])
+gate = get("/films/aura/gate", "POST")
+print("gate:", gate["shippable"], [(c["check"], c["pass"]) for c in gate["checks"]])
+job = get("/films/aura/beats/shot-aura-hero/render", "POST")
+print("shot render job:", job["job"])
+PY
 ```
-Expected: `{"films": [{"id": "aura", ...}, {"id": "gameshelf", ...}], "workspace": "/home/dev/Development/hewn-motion"}`
-
-```bash
-curl -s -X POST localhost:8756/api/plugins/hewn-video-studio/films/aura/gate | python3 -m json.tool
-```
-Expected: `"shippable": true` with three checks (`hook`, `motion`, `legibility`), each `"pass": true`.
-
-```bash
-curl -s -X POST localhost:8756/api/plugins/hewn-video-studio/films/aura/beats/shot-aura-hero/render
-```
-Expected: `{"job": "<id>", "output": "../renders/shots/shot-aura-hero.mp4"}`; poll
-`/jobs/<id>` until `"state": "done"` (~31 s for a 7 s shot at draft quality).
+Expected: `films: ['aura', 'gameshelf']`; `gate: True` with `hook`, `motion`, `legibility`
+all passing; a job id for the single-shot render (~31 s for a 7 s shot).
