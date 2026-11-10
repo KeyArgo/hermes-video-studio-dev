@@ -31,6 +31,14 @@ router.include_router(_assets_router)
 from video_studio.comfy_api import router as _comfy_router  # noqa: E402
 router.include_router(_comfy_router)
 
+# Script room: idea -> treatment -> film file.
+from video_studio.script_api import router as _script_router  # noqa: E402
+router.include_router(_script_router)
+
+# Timeline: place/trim/split/move/undo over a JSON edit, rendered by MLT.
+from video_studio.timeline_api import router as _timeline_router  # noqa: E402
+router.include_router(_timeline_router)
+
 MAX_JSON_BODY_BYTES = 256 * 1024
 
 

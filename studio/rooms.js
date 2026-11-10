@@ -53,6 +53,7 @@
     })
     if (room === 'assets') loadAssets()
     if (room === 'generate') loadComfy()
+    if (room === 'timeline' && window.__studioLoadTimeline) window.__studioLoadTimeline()
   }
 
   // ------------------------------------------------------------------ assets

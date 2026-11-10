@@ -13,6 +13,8 @@
     <nav class="rooms" id="rooms">
       <button class="room on" data-room="films">Films</button>
       <button class="room" data-room="assets">Assets</button>
+      <button class="room" data-room="script">Script</button>
+      <button class="room" data-room="timeline">Timeline</button>
       <button class="room" data-room="generate">Generate</button>
     </nav>
     <div class="rail-label">Films</div>
@@ -58,6 +60,45 @@
       <div id="asset-grid" class="asset-grid"><p class="hint">No assets yet.</p></div>
     </div>
 
+    <div id="room-script" class="room-view" hidden>
+      <div class="room-head">
+        <div>
+          <h2>Script</h2>
+          <div class="sub" id="script-sub">An idea becomes beats with spoken lines and seconds that add up.</div>
+        </div>
+        <div class="actions">
+          <button id="btn-draft" class="btn btn-primary">Draft beats</button>
+          <button id="btn-save-script" class="btn" disabled>Save as film</button>
+        </div>
+      </div>
+      <div class="script-form">
+        <textarea id="idea" rows="3" placeholder="What is the product, and what should a stranger understand in the first two seconds?"></textarea>
+        <div class="script-controls">
+          <label>seconds <input id="target-secs" class="num" type="number" value="30" min="10" max="300"></label>
+          <label>beats <input id="target-shots" class="num" type="number" value="5" min="2" max="24"></label>
+          <span id="script-status" class="mono-dim"></span>
+        </div>
+      </div>
+      <div id="beats-edit" class="beats-edit"></div>
+    </div>
+
+    <div id="room-timeline" class="room-view" hidden>
+      <div class="room-head">
+        <div>
+          <h2>Timeline</h2>
+          <div class="sub" id="tl-sub">Place, trim, split, move. Rendered by MLT from the same file.</div>
+        </div>
+        <div class="actions">
+          <button id="btn-tl-add" class="btn">Add clip</button>
+          <button id="btn-tl-undo" class="btn">Undo</button>
+          <button id="btn-tl-render" class="btn btn-primary">Render timeline</button>
+        </div>
+      </div>
+      <div id="tl-ruler" class="tl-ruler"></div>
+      <div id="tl-tracks" class="tl-tracks"></div>
+      <div id="tl-status" class="tl-status mono-dim"></div>
+    </div>
+
     <div id="room-generate" class="room-view" hidden>
       <div class="room-head">
         <div>
@@ -91,5 +132,7 @@
 </div>
 <script src="/app.js"></script>
 <script src="/rooms.js"></script>
+<script src="/script-ui.js"></script>
+<script src="/timeline.js"></script>
 </body>
 </html>

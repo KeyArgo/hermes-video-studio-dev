@@ -173,7 +173,6 @@ def listing() -> list[dict]:
             record = json.loads(sidecar.read_text())
         except (OSError, json.JSONDecodeError):
             continue
-        record.pop("master", None)
         items.append(record)
     return items
 

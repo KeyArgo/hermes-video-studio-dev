@@ -30,6 +30,11 @@ from video_studio.comfy_api import router as comfy_router  # noqa: E402
 app.include_router(assets_router, prefix="/api")
 app.include_router(comfy_router, prefix="/api")
 
+from video_studio.script_api import router as script_router  # noqa: E402
+from video_studio.timeline_api import router as timeline_router  # noqa: E402
+app.include_router(script_router, prefix="/api")
+app.include_router(timeline_router, prefix="/api")
+
 
 @app.get("/api/status")
 def status():

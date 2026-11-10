@@ -109,7 +109,8 @@ class Comfy:
                                .get("unet_name", {}) or loader.get("input", {})
                                .get("required", {}).get("ckpt_name", {}))
                     choices = _choices(options)
-                    if wanted in choices:
+                    # ComfyUI lists files by their path under models/, so match on the tail
+                    if any(c == wanted or c.endswith("/" + wanted) for c in choices):
                         present.append(wanted)
                         break
             available.append({"id": key, "label": spec["label"], "installed": present,

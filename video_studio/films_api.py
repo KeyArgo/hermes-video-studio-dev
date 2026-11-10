@@ -102,9 +102,14 @@ def list_films():
     _motion()
     films = []
     for p in sorted(FILMS.glob("*.json")):
+        # sidecars live beside films: .timeline.json, .history.json, .script.json are not films
+        if p.name.endswith((".timeline.json", ".history.json", ".script.json")):
+            continue
         try:
             data = json.loads(p.read_text())
         except Exception:
+            continue
+        if not isinstance(data, dict) or "beats" not in data:
             continue
         beats = data.get("beats") or []
         films.append({
