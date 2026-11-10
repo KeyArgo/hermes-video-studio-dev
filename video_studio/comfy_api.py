@@ -76,3 +76,52 @@ def comfy_render(body: dict):
     except ComfyError as exc:
         raise HTTPException(503, str(exc)) from None
     return result
+
+
+@router.post("/comfy/beat")
+def comfy_beat(body: dict):
+    """Render one film beat with MiniMax H3 and land it where the cut expects it.
+
+    The clip is written to `renders/shots/<beat id>.mp4` — the same place a HyperFrames shot
+    goes — so assembly does not care which engine made which beat.
+    """
+    from .gen_beat import load_graph, render_beat
+
+    film_id = body.get("film_id")
+    beat_id = body.get("beat_id")
+    if not film_id or not beat_id:
+        raise HTTPException(400, "film_id and beat_id are required")
+
+    from .films_api import FILMS, RENDERS
+
+    film_path = FILMS / f"{film_id}.json"
+    if not film_path.is_file():
+        raise HTTPException(404, f"no film {film_id}")
+    data = json.loads(film_path.read_text())
+    beat = next((b for b in data.get("beats") or [] if b.get("id") == beat_id), None)
+    if beat is None:
+        raise HTTPException(404, f"no beat {beat_id} in {film_id}")
+
+    name = body.get("workflow") or "h3-minimal.api.json"
+    graph_path = Path(name)
+    if not graph_path.is_absolute():
+        graph_path = _workspace() / "workflows" / name
+    if not graph_path.is_file():
+        raise HTTPException(404, f"no workflow at {graph_path}; copy it to {_workspace() / 'workflows'}")
+
+    if body.get("prompt"):
+        beat = {**beat, "shot": body["prompt"]}
+    dest = RENDERS / "shots" / f"{beat_id}.mp4"
+    try:
+        result = render_beat(client(), load_graph(graph_path), beat, dest,
+                             workdir=RENDERS / "h3",
+                             width=int(body.get("width", 768)),
+                             height=int(body.get("height", 448)),
+                             steps=int(body.get("steps", 20)),
+                             timeout=float(body.get("timeout", 1800)))
+    except ComfyError as exc:
+        raise HTTPException(503, str(exc)) from None
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(500, str(exc)) from None
+    return {"film": film_id, "beat": beat_id, **result,
+            "asset": str(dest.relative_to(_workspace()))}

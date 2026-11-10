@@ -212,6 +212,45 @@ def render(project: Project, out: Path, workdir: Path | None = None,
 
 
 # ----------------------------------------------------------------------- otio
+def _measure_loudness(path: Path) -> dict:
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(path), "-af",
+                        "loudnorm=I=-16:TP=-1.5:print_format=json", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    import re
+    import json as _json
+    m = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", r.stderr, re.S)
+    if not m:
+        return {}
+    d = _json.loads(m.group(0))
+    return {"lufs": float(d["input_i"]), "tp": float(d["input_tp"])}
+
+
+def normalise_audio(path: Path, low: float = -18.0, high: float = -14.0,
+                    target: float = -16.0) -> dict:
+    """Bring a rendered cut's audio into the delivery band, in place.
+
+    `melt` mixes a bed at its file level — a quiet bed arrives 20 dB down and plays as silence
+    on most systems. The gate now measures audio, so the fix belongs here rather than in a
+    manual ffmpeg step after every cut.
+    """
+    before = _measure_loudness(path)
+    if not before:
+        return {"audio": "none"}
+    if low <= before["lufs"] <= high:
+        return {"audio": "already in band", **before}
+    tmp = path.with_suffix(".norm.mp4")
+    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(path),
+                        "-c:v", "copy", "-af",
+                        f"loudnorm=I={target}:TP=-1.5:LRA=11",
+                        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(tmp)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"audio normalise failed: {r.stderr[-300:]}")
+    tmp.replace(path)
+    after = _measure_loudness(path)
+    return {"audio": "normalised", "before_lufs": before["lufs"], "after_lufs": after.get("lufs")}
+
+
 def to_otio(project: Project):
     """OpenTimelineIO timeline (optional dependency) — the project that outlives this tool."""
     import opentimelineio as otio

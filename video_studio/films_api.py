@@ -128,17 +128,25 @@ def get_film(fid: str):
     data = _load(fid)
     beats = []
     for b in data.get("beats") or []:
-        shot = _shot(b)
+        renderer = (b.get("renderer") or "html").lower()
+        shot: Path | None = None
+        try:
+            shot = _shot(b)
+        except HTTPException:
+            shot = None  # a generative beat has no composition; that is not an error
         out = _shot_render(b["id"])
         beats.append({
             "id": b["id"],
             "duration": float(b.get("duration", 0)),
             "src": b.get("src"),
-            "exists": shot.is_file(),
-            "bytes": shot.stat().st_size if shot.is_file() else 0,
+            "renderer": renderer,
+            "exists": bool(shot and shot.is_file()),
+            "bytes": shot.stat().st_size if shot and shot.is_file() else 0,
             "shot_render": out.name if out else None,
             "vo": b.get("vo"),
             "text": b.get("text"),
+            "shot": b.get("shot"),
+            "line": b.get("line"),
         })
     return {"id": fid, "title": data.get("title") or fid,
             "total": data.get("total"), "beats": beats, "renders": _rendered(fid)}
@@ -238,6 +246,9 @@ def render_shot(fid: str, bid: str):
     beat = next((b for b in data.get("beats") or [] if b.get("id") == bid), None)
     if not beat:
         raise HTTPException(status_code=404, detail=f"no beat {bid} in {fid}")
+    if (beat.get("renderer") or "html").lower() == "comfy":
+        raise HTTPException(status_code=400,
+                            detail=f"beat {bid} is rendered by a model: POST /comfy/beat")
     src = beat.get("src") or f"compositions/{bid}.html"
     SHOTS_OUT.mkdir(parents=True, exist_ok=True)
     out = f"../renders/shots/{bid}.mp4"
@@ -267,7 +278,7 @@ def gate(fid: str):
     code = (
         "import json,sys;sys.path.insert(0,%r);import gate;"
         "f=sys.argv[1];print(json.dumps(gate.verdict([gate.check_hook(f),"
-        "gate.check_motion(f),gate.check_legibility(%r)])))"
+        "gate.check_motion(f),gate.check_audio(f),gate.check_legibility(%r)])))"
         % (str(MOTION / "tools"), str(FILM_DIR))
     )
     r = subprocess.run(["python3", "-c", code, str(video)], capture_output=True, text=True, timeout=600)
@@ -309,3 +320,35 @@ def studio_host():
         return ensure_host()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=503, detail=f"studio host unavailable: {exc}") from None
+
+
+@router.post("/films/{fid}/assemble")
+def assemble_film(fid: str, body: dict | None = None):
+    """Cut the film from its beat clips with MLT, whoever rendered them.
+
+    Assumes `renders/shots/<beat id>.mp4` exists for every beat (HyperFrames shot or H3 clip);
+    a missing clip is reported by id instead of being papered over with a still frame.
+    """
+    from .mlt_project import from_beats, normalise_audio, render as mlt_render
+
+    body = body or {}
+    data = _load(fid)
+    beats = data.get("beats") or []
+    total = float(data.get("total") or sum(float(b.get("duration") or 0) for b in beats))
+    missing = [b["id"] for b in beats if not (SHOTS_OUT / f"{b['id']}.mp4").is_file()]
+    if missing:
+        raise HTTPException(400, f"not rendered yet: {', '.join(missing)}")
+
+    bed = None
+    for cand in (RENDERS / f"bed-{int(round(total))}.wav", RENDERS / "bed.wav"):
+        if cand.is_file():
+            bed = cand
+            break
+
+    project = from_beats(beats, SHOTS_OUT, bed=bed, total=total,
+                         title=fid, dissolve=float(body.get("dissolve", 0.0)))
+    out = RENDERS / f"{fid}-final.mp4"
+    res = mlt_render(project, out)
+    audio = normalise_audio(out) if bed else {"audio": "no bed"}
+    return {"film": fid, "output": out.name, "seconds": total,
+            "clips": len(project.video()), "bed": bed.name if bed else None, **res, **audio}

@@ -168,10 +168,74 @@
           ' · queue ' + (s.queue ? (s.queue.running + ' running / ' + s.queue.pending + ' pending') : '?') }))
       }
       $('gen-sub').textContent = s.configured_host || s.host
+      loadBeats()
     }).catch(function (e) {
       body.innerHTML = ''
       body.appendChild(el('p', { class: 'hint', text: 'Status failed: ' + e.message }))
     })
+  }
+
+  // ------------------------------------------------------------ generative beats
+  //
+  // One beat, one GPU job. The clip lands where the cut expects it
+  // (renders/shots/<beat id>.mp4), so a film can mix typed shots and generated ones.
+  function loadBeats() {
+    var list = $('gen-beat-list')
+    if (!list) return
+    var fid = window.__studioFilm
+    if (!fid) {
+      list.innerHTML = ''
+      list.appendChild(el('p', { class: 'hint', text: 'Pick a film in the rail first — then its beats appear here.' }))
+      return
+    }
+    $('gen-beat-film').textContent = fid
+    list.innerHTML = ''
+    list.appendChild(el('p', { class: 'hint', text: 'Reading beats…' }))
+    api('/films/' + encodeURIComponent(fid)).then(function (film) {
+      list.innerHTML = ''
+      ;(film.beats || []).forEach(function (b) {
+        var busy = el('span', { class: 'mono-dim', text: '' })
+        var btn = el('button', { class: 'btn small', text: 'Render with H3' })
+        btn.addEventListener('click', function () {
+          btn.disabled = true
+          busy.textContent = 'queued… (this takes minutes, not seconds)'
+          status('Rendering beat ' + b.id + ' with MiniMax H3')
+          api('/comfy/beat', { method: 'POST', body: JSON.stringify({ film_id: fid, beat_id: b.id }) })
+            .then(function (res) {
+              busy.textContent = res.seconds + 's clip · ' + res.width + '×' + res.height +
+                (res.comfy ? ' · ' + Math.round(res.comfy) + 's of GPU' : '')
+              status('Beat ' + b.id + ' rendered')
+            })
+            .catch(function (e) { busy.textContent = 'refused: ' + e.message })
+            .then(function () { btn.disabled = false })
+        })
+        list.appendChild(el('div', { class: 'gen-beat' }, [
+          el('div', { class: 'gen-beat-name' }, [
+            el('b', { text: b.id }),
+            el('span', { class: 'mono-dim', text: ' ' + b.duration + 's · ' + (b.renderer || 'html') })
+          ]),
+          el('div', { class: 'gen-beat-prompt', text: b.shot || b.line || '' }),
+          el('div', { class: 'gen-beat-actions' }, [btn, busy])
+        ]))
+      })
+    }).catch(function (e) {
+      list.innerHTML = ''
+      list.appendChild(el('p', { class: 'hint', text: 'Could not read the film: ' + e.message }))
+    })
+  }
+
+  function assemble() {
+    var fid = window.__studioFilm
+    if (!fid) { status('Pick a film first'); return }
+    var btn = $('btn-gen-assemble')
+    btn.disabled = true
+    status('Assembling ' + fid + ' from its beat clips…')
+    api('/films/' + encodeURIComponent(fid) + '/assemble', { method: 'POST', body: '{}' })
+      .then(function (r) {
+        status('Cut written: ' + r.output + ' (' + r.clips + ' clips, ' + r.seconds + 's)')
+      })
+      .catch(function (e) { status('Assemble refused: ' + e.message) })
+      .then(function () { btn.disabled = false })
   }
 
   function upload(files) {
@@ -210,6 +274,7 @@
     })
     var s = $('btn-scan'); if (s) s.addEventListener('click', scan)
     var g = $('btn-gen-refresh'); if (g) g.addEventListener('click', loadComfy)
+    var asm = $('btn-gen-assemble'); if (asm) asm.addEventListener('click', assemble)
     var pick = $('file-input'); if (pick) pick.addEventListener('change', function () { upload(pick.files); pick.value = '' })
     var add = $('btn-add'); if (add) add.addEventListener('click', function () { if (pick) pick.click() })
     var grid = $('asset-grid')
