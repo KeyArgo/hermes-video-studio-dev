@@ -471,6 +471,20 @@ def record_targets():
     return targets()
 
 
+@router.get("/capture/record/capabilities")
+def record_capabilities():
+    """What this machine can record, and the choices that follow (monitors, mics, fps, quality)."""
+    from .recorder import capabilities
+    return capabilities()
+
+
+@router.get("/capture/record/takes")
+def record_takes():
+    """The takes already recorded, newest first, probed the same way a fresh one is."""
+    from .recorder import takes
+    return {"takes": takes()}
+
+
 @router.post("/capture/record/start")
 def record_start(body: dict):
     """Start a desktop recording. Returns at once; the file is finalised by /stop."""
@@ -488,7 +502,12 @@ def record_start(body: dict):
     name = body.get("name") or f"desktop-{int(time.time())}"
     out = RENDERS / "captures" / f"{name}.mp4"
     result = start(out, geometry=geo, seconds=body.get("seconds"),
-                   audio=bool(body.get("audio")), label=body.get("label") or name)
+                   audio=bool(body.get("audio")) if "audio" in body else None,
+                   label=body.get("label") or name,
+                   quality=body.get("quality"), fps=body.get("fps"),
+                   smooth=body.get("smooth"), audio_device=body.get("audio_device"),
+                   output=body.get("output"), codec=body.get("codec"),
+                   film=body.get("film"), beat=body.get("beat"))
     if not result.get("ok"):
         raise HTTPException(409, detail=result)
     return result

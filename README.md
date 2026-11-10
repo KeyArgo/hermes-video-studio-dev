@@ -140,6 +140,18 @@ The Production room's **Footage sources** panel shows whether the recorder is pr
 would be used for, and when it is the wrong tool (anything with a URL — browser capture is cleaner,
 1080p, and shows no other windows).
 
+**Record a take…** opens a sheet with the controls a real recording needs, each labelled:
+
+| Control | Why it exists |
+|---|---|
+| **Aim at** | whole screen, a listed window (from `wmctrl`), or a monitor (`wf-recorder -L`) |
+| **Quality** | draft / standard / high → preset + CRF; draft is for timing a take, high is for the shot that ships |
+| **Frame rate** | 30 / 60 / 120. 60 matches the display; a 30 fps take of a 60 Hz screen judders in the cut |
+| **Length** | 15 / 30 / 60 s or until stopped — the timer lives in the host, so a closed page cannot leave a recorder filling the disk |
+| **every frame** | `--no-damage`. Without it wf-recorder only sends frames when the screen changes, which reads as stutter once it is in a 30 fps cut |
+| **sound** | `--audio`, optionally a named PipeWire/Pulse source from `pactl` |
+| **takes** | everything recorded here, probed (duration, size, and *broken: no video stream* when a take was cut off) |
+
 Once it is installed the recording is a first-class source, not a file on disk:
 
 - **aim** it at the whole screen or at a specific window (window list comes from `wmctrl`);

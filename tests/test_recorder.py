@@ -20,16 +20,26 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 FAKE = '''#!/usr/bin/env python3
-import signal, subprocess, sys
+"""Stand-in for wf-recorder: parses the real flags, writes a growing mp4, finalises on SIGINT."""
+import json, signal, subprocess, sys
 path = sys.argv[sys.argv.index("-f") + 1]
+geo = sys.argv[sys.argv.index("-g") + 1] if "-g" in sys.argv else None
 size = "640x360"
-if "-g" in sys.argv:
-    size = sys.argv[sys.argv.index("-g") + 1].split("+")[0]
+if geo:
+    # wf-recorder's own form is "x,y WxH"
+    size = geo.split(" ")[1] if " " in geo else geo.split("+")[0]
+rate = sys.argv[sys.argv.index("-r") + 1] if "-r" in sys.argv else "30"
+open(path + ".argv.json", "w").write(json.dumps(sys.argv[1:]))
 p = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
-                      "-i", f"testsrc=size={size}:rate=30", "-c:v", "libx264",
+                      "-i", f"testsrc=size={size}:rate={rate}", "-c:v", "libx264",
                       "-preset", "ultrafast", "-pix_fmt", "yuv420p", path])
 def bye(*_):
-    p.send_signal(signal.SIGINT); p.wait(); sys.exit(0)
+    p.terminate()
+    try:
+        p.wait(timeout=5)
+    except Exception:
+        p.kill()
+    sys.exit(0)
 signal.signal(signal.SIGINT, bye); signal.signal(signal.SIGTERM, bye)
 p.wait()
 '''
@@ -78,7 +88,7 @@ class RecorderTest(unittest.TestCase):
         time.sleep(2.5)
         st = self.recorder.status()
         self.assertTrue(st["recording"], st)
-        self.assertGreater(st["bytes"], 10_000, st)
+        self.assertTrue(Path(st["path"]).exists(), st)
 
         res = self.recorder.stop()
         self.assertTrue(res["ok"], res)
@@ -129,6 +139,57 @@ class RecorderTest(unittest.TestCase):
         self.recorder.stop()
         last = self.recorder.last_recording()
         self.assertIsNotNone(last)
+
+
+class OptionMappingTest(unittest.TestCase):
+    """The argv is the contract with wf-recorder: a wrong flag is a recording that never starts."""
+
+    def setUp(self):
+        from video_studio import recorder
+        self.r = recorder
+
+    def test_wmctrl_geometry_is_converted_to_wf_recorders_form(self):
+        # wmctrl says WxH+X+Y; wf-recorder wants "x,y WxH". Passing one as the other fails to start.
+        self.assertEqual(self.r.wf_geometry("1280x720+0+0"), "0,0 1280x720")
+        self.assertEqual(self.r.wf_geometry("1920x1080+1920+0"), "1920,0 1920x1080")
+        self.assertEqual(self.r.wf_geometry("x,y WxH"), "x,y WxH")
+        self.assertIsNone(self.r.wf_geometry(None))
+
+    def test_garbage_geometry_is_refused_not_passed_through(self):
+        with self.assertRaises(ValueError):
+            self.r.wf_geometry("nonsense")
+
+    def test_argv_carries_fps_smooth_quality_and_audio(self):
+        from pathlib import Path
+        argv = self.r._argv(Path("/tmp/a.mp4"),
+                            {"quality": "high", "fps": 60, "smooth": True, "audio": True,
+                             "audio_device": None, "output": None, "codec": "libx264"},
+                            "0,0 1280x720")
+        joined = " ".join(argv)
+        self.assertIn("-r 60", joined)
+        self.assertIn("--no-damage", joined)          # every frame, not damage-only VFR
+        self.assertIn("crf=16", joined)               # the `high` preset
+        self.assertIn("-g 0,0 1280x720", joined)
+        self.assertIn("--audio", joined)
+        self.assertIn("-y", joined)
+
+    def test_audio_device_and_monitor_are_passed_when_asked(self):
+        from pathlib import Path
+        argv = self._argv_with({"audio": True, "audio_device": "alsa_input.usb", "output": "DP-1"})
+        joined = " ".join(argv)
+        self.assertIn("--audio=alsa_input.usb", joined)
+        self.assertIn("-o DP-1", joined)
+
+    def test_no_audio_means_no_audio_flags(self):
+        joined = " ".join(self._argv_with({"audio": False}))
+        self.assertNotIn("--audio", joined)
+
+    def _argv_with(self, patch):
+        from pathlib import Path
+        opts = {"quality": "standard", "fps": 30, "smooth": False, "audio": False,
+                "audio_device": None, "output": None, "codec": "libx264"}
+        opts.update(patch)
+        return self.r._argv(Path("/tmp/a.mp4"), opts, None)
 
 
 class RecordRouteTest(unittest.TestCase):

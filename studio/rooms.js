@@ -395,7 +395,12 @@
         el('span', { class: desk.ready ? 'cap-ok' : 'cap-missing', text: desk.ready ? 'ready' : 'missing' })
       ]))
       if (actions.childNodes.length) body.appendChild(actions)
-      if (desk.ready) body.appendChild(recorderPanel())
+      if (desk.ready) {
+        var open = el('button', { class: 'btn small', text: 'Record a take…' })
+        // not `openRecorder` directly: the handler would receive the click event as the beat
+        open.addEventListener('click', function () { openRecorder() })
+        body.appendChild(el('div', { class: 'cap-actions' }, [open]))
+      }
       body.appendChild(el('div', { class: 'cap-why' }, [
         el('b', { text: 'When desktop capture is the right tool' }),
         el('ul', {}, (d.when_useful || []).map(function (x) { return el('li', { text: x }) })),
@@ -461,69 +466,121 @@
       .catch(function (e) { out.innerHTML = ''; out.appendChild(el('p', { class: 'hint', text: e.message })) })
   }
 
-  // A recorder that is aimed, not guessed: pick the window you are about to demo, hit record,
-  // drive the app, hit stop — the clip is already in Assets and can be dropped into a beat.
-  function recorderPanel() {
-    var box = el('div', { class: 'cap-rec' })
-    var targets = el('select', { class: 'review-model' })
-    var secs = el('select', { class: 'review-model' })
-    ;[15, 30, 60, 0].forEach(function (n) {
-      secs.appendChild(el('option', { value: n, text: n ? n + ' seconds' : 'until I stop' }))
-    })
-    var audio = el('label', { class: 'cap-audio' }, [el('input', { type: 'checkbox' }), el('span', { text: ' audio' })])
-    var go = el('button', { class: 'btn small', text: 'Record' })
-    var st = el('span', { class: 'mono-dim', text: '' })
-    var timer = null
+  // A recorder that is aimed and configured, not guessed: pick the window you are about to demo,
+  // the frame rate, whether sound comes along, whether this take is for a beat — hit record,
+  // drive the app, hit stop. The clip lands in Assets and can be cut straight into a beat.
+  function openRecorder(beat) {
+    var modal = $('rec-modal'), body = $('rec-body')
+    if (!modal || !body) return
+    body.innerHTML = ''
+    body.appendChild(recorderPanel(beat))
+    modal.hidden = false
+    var intro = $('rec-intro')
+    if (intro) intro.textContent = beat
+      ? 'Recording for beat "' + beat + '". Hit record, drive the app, then use the take in that beat.'
+      : 'Aim it at the window you are about to demo, pick a length, hit record, then drive the app.'
+    var close = $('rec-close')
+    if (close) close.onclick = function () { modal.hidden = true }
+    modal.onclick = function (e) { if (e.target === modal) modal.hidden = true }
+  }
 
-    api('/capture/record/targets').then(function (t) {
-      targets.innerHTML = ''
-      targets.appendChild(el('option', { value: '', text: 'Whole screen' }))
-      ;(t.windows || []).forEach(function (w) {
-        targets.appendChild(el('option', { value: w.geometry, text: w.label + '  (' + w.size + ')' }))
+  function recorderPanel(beatId) {
+    var box = el('div', { class: 'cap-rec' })
+    var row = el('div', { class: 'cap-rec-row' })
+    var target = el('select', { class: 'review-model' })
+    var quality = el('select', { class: 'review-model' })
+    var fps = el('select', { class: 'review-model' })
+    var secs = el('select', { class: 'review-model' })
+    var smooth = el('label', { class: 'cap-audio' }, [el('input', { type: 'checkbox' }), el('span', { text: ' every frame' })])
+    var audio = el('label', { class: 'cap-audio' }, [el('input', { type: 'checkbox' }), el('span', { text: ' sound' })])
+    var mic = el('select', { class: 'review-model', hidden: true })
+    var go = el('button', { class: 'btn small', text: 'Record' })
+    var st = el('span', { class: 'mono-dim' })
+    var timer = null, caps = null
+
+    function opt(sel, value, text, selected) {
+      var o = el('option', { value: value, text: text })
+      if (selected) o.selected = true
+      sel.appendChild(o)
+    }
+
+    api('/capture/record/capabilities').then(function (c) {
+      caps = c
+      var d = c.defaults || {}
+      target.innerHTML = ''
+      opt(target, '', 'Whole screen')
+      api('/capture/record/targets').then(function (tg) {
+        ;(tg.windows || []).forEach(function (w) {
+          var o = el('option', { value: w.geometry, text: w.label + '  (' + w.size + ')' })
+          o.dataset.kind = 'window'
+          target.appendChild(o)
+        })
+        ;(tg.monitors || []).forEach(function (m) {
+          var o = el('option', { value: m, text: 'Monitor ' + m })
+          o.dataset.kind = 'monitor'
+          target.appendChild(o)
+        })
+      }).catch(function () {})
+
+      ;(c.qualities || ['standard']).forEach(function (q) { opt(quality, q, q, q === d.quality) })
+      ;(c.framerate || [60]).forEach(function (f) { opt(fps, f, f + ' fps', f === d.fps) })
+      ;[[15, '15 seconds'], [30, '30 seconds'], [60, '60 seconds'], [0, 'until I stop']].forEach(function (p) {
+        opt(secs, p[0], p[1], p[0] === 0)
       })
-    }).catch(function () {})
+      smooth.querySelector('input').checked = d.smooth !== false
+      audio.querySelector('input').checked = !!d.audio
+      ;(c.audio_sources || []).slice(0, 8).forEach(function (s) {
+        opt(mic, s.name, s.name.replace(/^(alsa_output|alsa_input)\./, ''))
+      })
+      if (!(c.audio_sources || []).length) {
+        mic.appendChild(el('option', { value: '', text: 'no sources found — is pactl installed?' }))
+      }
+      mic.hidden = !audio.querySelector('input').checked
+      audio.querySelector('input').addEventListener('change', function () {
+        mic.hidden = !audio.querySelector('input').checked
+      })
+    }).catch(function (e) { st.textContent = 'cannot read recorder capabilities: ' + e.message })
 
     function poll() {
       api('/capture/record/status').then(function (r) {
         if (r.recording) {
           st.textContent = 'recording ' + r.elapsed.toFixed(1) + 's · ' + (r.bytes / 1e6).toFixed(1) + ' MB'
+            + (r.options ? ' · ' + r.options.fps + 'fps ' + r.options.quality : '')
             + (r.warning ? ' · ' + r.warning : '')
         } else if (r.state === 'stopped') {
-          st.textContent = 'stopped'
           clearInterval(timer); timer = null
           go.textContent = 'Record'; go.classList.remove('danger')
-          refreshLast()
+          showResult(r.result || {}, r.film, r.beat)
         }
       }).catch(function () {})
     }
 
-    function refreshLast() {
-      api('/capture/record/status').then(function (r) {
-        var res = r.result || {}
-        if (!res.path) return
-        st.textContent = res.ok
-          ? 'saved ' + res.seconds + 's · ' + (res.probe.width || '?') + '×' + (res.probe.height || '?')
-            + (res.asset && res.asset.id ? ' · in Assets' : '')
-          : 'failed: ' + ((res.probe || {}).reason || 'unknown')
-        if (res.ok) box.appendChild(useInBeat())
-      }).catch(function () {})
+    function showResult(res, film, beat) {
+      if (!res.path) return
+      st.textContent = res.ok
+        ? 'saved ' + res.seconds + 's · ' + (res.probe.width || '?') + '×' + (res.probe.height || '?')
+          + (res.asset && res.asset.id ? ' · in Assets' : '')
+        : 'failed: ' + ((res.probe || {}).reason || 'unknown')
+      if (res.ok) box.appendChild(useInBeat(film || window.__studioFilm, beat))
+      loadTakes()
     }
 
-    function useInBeat() {
+    function useInBeat(filmId, beatId) {
       var wrap = el('div', { class: 'cap-rec-beat' })
       var sel = el('select', { class: 'review-model' })
       var apply = el('button', { class: 'btn small', text: 'Use in beat' })
-      var fid = window.__studioFilm
-      if (!fid) return el('div', { class: 'mono-dim', text: 'open a film to drop this into a beat' })
-      api('/films/' + encodeURIComponent(fid)).then(function (f) {
+      if (!filmId) return el('div', { class: 'mono-dim', text: 'open a film to cut this into a beat' })
+      api('/films/' + encodeURIComponent(filmId)).then(function (f) {
         (f.beats || []).forEach(function (b) {
-          sel.appendChild(el('option', { value: b.id, text: (b.title || b.id) + ' · ' + Math.round(b.duration || 0) + 's' }))
+          var o = el('option', { value: b.id, text: (b.title || b.id) + ' · ' + Math.round(b.duration || 0) + 's' })
+          if (beatId && b.id === beatId) o.selected = true
+          sel.appendChild(o)
         })
       }).catch(function () {})
       apply.addEventListener('click', function () {
         apply.disabled = true
         status('Cutting footage into ' + sel.value + '…')
-        api('/films/' + encodeURIComponent(fid) + '/beats/' + encodeURIComponent(sel.value) + '/footage',
+        api('/films/' + encodeURIComponent(filmId) + '/beats/' + encodeURIComponent(sel.value) + '/footage',
             { method: 'POST', body: JSON.stringify({ capture: 'last' }) })
           .then(function (r) { status('Beat ' + r.beat + ' now plays real footage'); apply.disabled = false })
           .catch(function (e) { status('Could not use it: ' + e.message); apply.disabled = false })
@@ -532,28 +589,70 @@
       return wrap
     }
 
+    function loadTakes() {
+      api('/capture/record/takes').then(function (r) {
+        var list = r.takes || []
+        if (!list.length) return
+        var wrap = el('div', { class: 'cap-takes' })
+        wrap.appendChild(el('div', { class: 'mono-dim', text: 'takes' }))
+        list.slice(0, 5).forEach(function (t) {
+          wrap.appendChild(el('div', { class: 'cap-take' }, [
+            el('b', { text: t.name }),
+            el('span', { class: 'mono-dim', text: (t.ok ? t.seconds + 's · ' + t.width + '×' + t.height
+              : 'broken: ' + (t.reason || 'unknown')) + ' · ' + (t.bytes / 1e6).toFixed(1) + ' MB' })
+          ]))
+        })
+        box.appendChild(wrap)
+      }).catch(function () {})
+    }
+
     go.addEventListener('click', function () {
       if (timer) {
         go.disabled = true
         api('/capture/record/stop', { method: 'POST', body: '{}' })
-          .then(function (r) { status(r.ok ? 'Saved ' + r.seconds + 's' : 'Recording failed: ' + r) })
+          .then(function (r) { status(r.ok ? 'Saved ' + r.seconds + 's' : 'Recording failed') })
           .catch(function (e) { status('Stop failed: ' + e.message) })
           .finally(function () { go.disabled = false })
         return
       }
-      var body = { name: 'desktop-' + Date.now(), geometry: targets.value || null,
-                   seconds: Number(secs.value) || null, audio: audio.querySelector('input').checked }
+      var chosen = target.options[target.selectedIndex]
+      var kind = (chosen && chosen.dataset.kind) || ''
+      var body = {
+        name: 'desktop-' + Date.now(),
+        seconds: Number(secs.value) || null,
+        quality: quality.value, fps: Number(fps.value),
+        smooth: smooth.querySelector('input').checked,
+        audio: audio.querySelector('input').checked,
+        audio_device: audio.querySelector('input').checked ? (mic.value || null) : null,
+        film: window.__studioFilm || null
+      }
+      if (kind === 'monitor') body.output = target.value
+      else if (target.value) body.geometry = target.value
       api('/capture/record/start', { method: 'POST', body: JSON.stringify(body) })
-        .then(function () {
+        .then(function (r) {
           go.textContent = 'Stop'; go.classList.add('danger')
+          st.textContent = 'recording · ' + (r.cmd || '')
           timer = setInterval(poll, 1000); poll()
         })
         .catch(function (e) { status('Could not start: ' + e.message) })
     })
 
-    refreshLast()
-    box.appendChild(el('div', { class: 'cap-rec-row' }, [targets, secs, audio, go]))
+    // every control wears its own label: four unlabelled dropdowns are a guessing game
+    function field(label, control) {
+      return el('label', { class: 'cap-field' }, [el('span', { text: label }), control])
+    }
+    row.appendChild(field('Aim at', target))
+    row.appendChild(field('Quality', quality))
+    row.appendChild(field('Frame rate', fps))
+    row.appendChild(field('Length', secs))
+    row.appendChild(el('div', { class: 'cap-field cap-field-check' }, [el('span', { text: 'Options' }),
+      el('div', { class: 'cap-checks' }, [smooth, audio])]))
+    row.appendChild(go)
+    box.appendChild(row)
+    box.appendChild(mic)
     box.appendChild(st)
+    if (beatId) box.dataset.beat = beatId
+    loadTakes()
     return box
   }
 

@@ -443,3 +443,33 @@ html, body {
 .cap-rec .mono-dim { font-size: 10.5px; }
 .cap-rec-beat { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
 .btn.danger { border-color: #b4443a; color: #f0a49c; }
+
+/* takes recorded here, newest first */
+.cap-takes { display: grid; gap: 4px; margin-top: 2px; }
+.cap-take { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.cap-take b { font-size: 11px; font-family: var(--mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+.cap-take .mono-dim { font-size: 10px; }
+.cap-rec-row { grid-template-columns: 1.5fr .8fr .7fr .9fr auto auto auto; }
+
+/* labelled recorder fields */
+.cap-field { display: grid; gap: 3px; align-content: end; min-width: 0; }
+.cap-field > span { font-size: 9px; letter-spacing: .13em; text-transform: uppercase; color: var(--dim); }
+.cap-field select { width: 100%; }
+.cap-field-check .cap-checks { display: flex; gap: 10px; align-items: center; height: 31px; }
+/* the panel is used in a ~1100x700 pane and in a narrow browser tab: wrap rather than squeeze */
+.cap-rec-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.cap-field { flex: 1 1 104px; min-width: 0; }
+.cap-rec-row .btn { flex: 0 0 auto; align-self: end; margin-bottom: 0; }
+.cap-field > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* the recorder gets its own sheet: the Production column is too narrow for real controls */
+.rec-modal { position: fixed; inset: 0; background: rgba(4,6,10,.72); display: grid; place-items: center; z-index: 40; }
+.rec-modal[hidden] { display: none !important; }
+.rec-sheet { width: min(760px, 92vw); max-height: 86vh; overflow: auto; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px 18px; box-shadow: 0 24px 80px #0008; }
+.rec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.rec-head h3 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+.rec-sheet .cap-rec { border: 0; background: transparent; padding: 0; }
+.rec-sheet .cap-field { flex: 1 1 150px; }
+.rec-sheet .hint { margin: 0 0 12px; }
