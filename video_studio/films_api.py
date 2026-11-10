@@ -249,6 +249,60 @@ def render_film(fid: str):
     return {"job": jid, "output": out}
 
 
+@router.post("/films/{fid}/beats/{bid}/footage")
+def beat_from_footage(fid: str, bid: str, body: dict | None = None):
+    """Make a beat out of real captured footage instead of a composition.
+
+    The clip is trimmed to the beat's duration, dressed to match the film (letterbox bars and a
+    vignette, the same as the cinematic treatment uses), graded slightly cooler and given light
+    grain so it sits beside rendered shots rather than looking pasted in. It is written to
+    `renders/shots/<beat id>.mp4` like any other beat clip, so assembly is unchanged.
+    """
+    body = body or {}
+    data = _load(fid)
+    beat = next((b for b in data.get("beats") or [] if b.get("id") == bid), None)
+    if beat is None:
+        raise HTTPException(status_code=404, detail=f"no beat {bid} in {fid}")
+    capture = body.get("capture") or "studio-walkthrough"
+    src = RENDERS / "captures" / f"{_clean(capture, 'capture')}.mp4"
+    if not src.is_file():
+        raise HTTPException(status_code=404, detail=f"no capture at {src}")
+
+    seconds = float(body.get("seconds") or beat.get("duration") or 0)
+    start = float(body.get("start") or 0.0)
+    if seconds <= 0:
+        raise HTTPException(status_code=400, detail="beat has no duration")
+
+    # a screen recording is mostly still; the cut needs motion in every second, so the frame
+    # is scaled 4% larger and slowly panned — the standard treatment for screen footage
+    big_w, big_h = int(1920 * 1.04), int(1080 * 1.04)
+    filt = [f"scale={big_w}:{big_h}:flags=lanczos", "fps=30", "setsar=1",
+            f"crop=1920:1080:x='(iw-1920)*t/{seconds:.3f}':y='(ih-1080)*t/{seconds:.3f}'"]
+    if body.get("letterbox", True):
+        filt += ["drawbox=x=0:y=0:w=iw:h=ih*0.048:color=black:t=fill",
+                 "drawbox=x=0:y=ih*0.952:w=iw:h=ih*0.048:color=black:t=fill",
+                 # a dark interface under a strong vignette measures 3/255 — the same trap as
+                 # the letterbox: dress the frame, do not bury the picture
+                 "vignette=PI/8"]
+    if body.get("grade", True):
+        filt += ["eq=contrast=1.08:saturation=1.05:brightness=0.05", "noise=alls=4:allf=t"]
+
+    SHOTS_OUT.mkdir(parents=True, exist_ok=True)
+    dest = SHOTS_OUT / f"{bid}.mp4"
+    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{start:.3f}", "-i", str(src),
+                        "-t", f"{seconds:.3f}", "-vf", ",".join(filt), "-an",
+                        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                        "-pix_fmt", "yuv420p", str(dest)], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"footage cut failed: {r.stderr[-400:]}")
+
+    beat["renderer"] = "capture"
+    beat["capture"] = {"name": capture, "start": start, "seconds": seconds}
+    _save(fid, data)
+    return {"film": fid, "beat": bid, "renderer": "capture", "output": str(dest),
+            "seconds": seconds, "start": start, "bytes": dest.stat().st_size}
+
+
 @router.post("/films/{fid}/beats/{bid}/render")
 def render_shot(fid: str, bid: str):
     data = _load(fid)

@@ -66,12 +66,15 @@ def studio_walkthrough(url: str, out: Path) -> dict:
     """The demo most films need: the product being used, in the order a stranger can follow.
 
     Kept here rather than in the UI so it can be re-shot identically after any change, and so a
-    regression in the interface shows up as a failed capture rather than a bad video.
+    regression in the interface shows up as a failed capture rather than a bad video. The player
+    is started on purpose: footage of an interface sitting still proves nothing; footage of it
+    running the work does.
     """
     steps = [
         {"wait": 900},
         {"click": ".room[data-room='films']", "after": 1200},
-        {"wait": 900},
+        {"eval": "(() => { const v = document.getElementById('player'); if (v) { v.muted = true; v.currentTime = 3.2; v.play().catch(() => {}); } })()", "after": 2800},
+        {"wait": 1600},
         {"click": ".room[data-room='assets']", "after": 1600},
         {"wait": 700},
         {"click": ".room[data-room='script']", "after": 1600},

@@ -129,3 +129,14 @@ plugin's running host and opens it. Both sides discover each other's port from t
 (letterbox + vignette), *kinetic* (amber, harder edges) — at half frame rate and quarter size,
 with the film's music already under them. A 24 s film becomes three ~1 MB files in a few minutes,
 so the choice of direction is made by watching, not by imagining.
+
+
+## Real footage, not impressions
+
+`POST /capture/run` records a page being used: a list of steps (click, type, scroll, move,
+evaluate), a synthetic cursor drawn and animated so the recording shows someone using the
+product, then 1080p30 H.264. `POST /films/{id}/beats/{beat}/footage` turns any capture into a
+beat — trimmed, slowly panned, letterboxed and graded to match the film.
+
+A film built only from HTML a model wrote can only prove that a model can write HTML. A beat of
+the product actually working is the one thing in the cut that cannot be invented.

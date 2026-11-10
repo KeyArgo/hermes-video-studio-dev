@@ -32,7 +32,8 @@ async function moveCursor(page, x, y) {
 
 async function run(spec) {
   const { url, steps = [], out, width = 1920, height = 1080 } = spec;
-  const browser = await chromium.launch({ args: ["--no-sandbox", "--force-device-scale-factor=1"] });
+  const browser = await chromium.launch({ args: ["--no-sandbox", "--force-device-scale-factor=1",
+                       "--autoplay-policy=no-user-gesture-required"] });
   const ctx = await browser.newContext({
     viewport: { width, height },
     recordVideo: { dir: out, size: { width, height } },
@@ -50,6 +51,7 @@ async function run(spec) {
     if (step.wait) { await page.waitForTimeout(step.wait); continue; }
     if (step.mouse) { await moveCursor(page, step.mouse[0], step.mouse[1]); continue; }
     if (step.scroll) { await page.mouse.wheel(0, step.scroll); await page.waitForTimeout(500); continue; }
+    if (step.eval) { await page.evaluate(step.eval); await page.waitForTimeout(step.after || 600); continue; }
     if (step.click) {
       const el = await page.$(step.click);
       if (!el) { console.error("missing selector: " + step.click); continue; }
