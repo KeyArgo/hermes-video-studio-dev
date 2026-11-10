@@ -51,8 +51,8 @@ bed into the film; **Music Studio** supplies real tracks; **Playwright** records
 
 | Thing | Value |
 |---|---|
-| Build | `v1.0.0-dev.22 · 2026-11-10 · dc1d5436` (`GET /api/version`, chip in the header) |
-| Repo | `KeyArgo/hermes-video-studio-dev`, private, master `dc1d543`, 22 commits |
+| Build | read it, do not trust this file: `GET /api/version` or the header chip (at handover: `1.0.0-dev.22+`) |
+| Repo | `KeyArgo/hermes-video-studio-dev`, private, master `e64be36`, ~23 commits |
 | Tests | **78 green** — timeline/script 17, assets/comfy 10, gen_beat 9, assemble 5, music/drafts 9, review 13, legacy 15 |
 | Studio host | `127.0.0.1:36659`, state in `~/.hermes/plugin-data/hewn-video-studio/studio-host.json` |
 | Routes | 55 (`GET /openapi.json`) |
