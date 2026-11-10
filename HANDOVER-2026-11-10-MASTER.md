@@ -41,6 +41,17 @@ FastAPI app plus a static studio UI (no build step). Six rooms, three engines:
 | **Music** | tracks read from Music Studio's store, attach as bed, open Music Studio |
 | **Production** | the eight ordered stages + footage sources (browser/desktop capability) |
 
+### 2.1 Two surfaces in one repo — do not confuse them
+
+| Surface | Entry | Backend | Routes |
+|---|---|---|---|
+| **Studio app** (what the user means by "Video Studio") | `python3 -m video_studio.host_launcher` → `127.0.0.1:36659` | `video_studio/films_api.py` + `assets_api`, `script_api`, `timeline_api`, `comfy_api`, `music`, `capture`, `review`, `drafts` | 55 under `/api/*` |
+| **Dashboard tab** (the older cut surface inside Hermes) | `dashboard/plugin_api.py` (mounted by Hermes) | `video_studio/edl.py` (795 lines) + `service.py` + `store.py` — EDL/ops engine with captions, silence detection, scene cuts, cards | `/projects/*` |
+
+Both are live and both have tests. New work in this session went into the **studio app**; `edl.py`
+predates it and is not exposed through the studio host. If a route is missing from `/openapi.json`
+on 36659, it is almost certainly a dashboard-side route, not a bug.
+
 Engines: **HyperFrames** (`hyperframes@0.9.26`) renders typed HTML/GSAP shots; **MiniMax H3 on
 ComfyUI** (sparke, `10.0.0.52:8188`) renders generative beats; **MLT/`melt`** cuts beat clips +
 bed into the film; **Music Studio** supplies real tracks; **Playwright** records real UI footage.
@@ -53,7 +64,7 @@ bed into the film; **Music Studio** supplies real tracks; **Playwright** records
 |---|---|
 | Build | read it, do not trust this file: `GET /api/version` or the header chip (at handover: `1.0.0-dev.22+`) |
 | Repo | `KeyArgo/hermes-video-studio-dev`, private, master `e64be36`, ~23 commits |
-| Tests | **78 green** — timeline/script 17, assets/comfy 10, gen_beat 9, assemble 5, music/drafts 9, review 13, legacy 15 |
+| Tests | **82 green + 6 card checks** — studio side: timeline/script 17, assets/comfy 10, gen_beat 9, assemble 5, music/drafts 9, review 13, legacy 15; EDL side: cards 4, card-ops 6/6 |
 | Studio host | `127.0.0.1:36659`, state in `~/.hermes/plugin-data/hewn-video-studio/studio-host.json` |
 | Routes | 55 (`GET /openapi.json`) |
 | Music Studio | `127.0.0.1:8775`, linked both ways, 4 takes available |
