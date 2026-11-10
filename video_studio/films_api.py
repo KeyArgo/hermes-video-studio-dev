@@ -264,7 +264,18 @@ def beat_from_footage(fid: str, bid: str, body: dict | None = None):
     if beat is None:
         raise HTTPException(status_code=404, detail=f"no beat {bid} in {fid}")
     capture = body.get("capture") or "studio-walkthrough"
-    src = RENDERS / "captures" / f"{_clean(capture, 'capture')}.mp4"
+    if capture == "last":
+        # the tight path: record, stop, then use what was just recorded without typing a name
+        from .recorder import last_recording
+        src = last_recording()
+        if src is None:
+            raise HTTPException(status_code=404, detail="no finished recording yet — POST /capture/record/stop first")
+        capture = src.stem
+    else:
+        as_path = Path(str(capture)).expanduser()
+        src = as_path if as_path.is_absolute() and as_path.is_file() \
+            else RENDERS / "captures" / f"{_clean(capture, 'capture')}.mp4"
+        capture = src.stem
     if not src.is_file():
         raise HTTPException(status_code=404, detail=f"no capture at {src}")
 
@@ -451,6 +462,58 @@ def set_treatment(fid: str, body: dict):
     _save(fid, data)
     return {"film": fid, "treatment": name, "changed": changed,
             "skipped": skipped, "backup": str(backup)}
+
+
+@router.get("/capture/record/targets")
+def record_targets():
+    """What a recording can be aimed at: the whole screen, an app window, or a region."""
+    from .recorder import targets
+    return targets()
+
+
+@router.post("/capture/record/start")
+def record_start(body: dict):
+    """Start a desktop recording. Returns at once; the file is finalised by /stop."""
+    from .recorder import start
+    from .paths import RENDERS
+
+    geo = body.get("geometry")
+    if not geo and body.get("window"):
+        want = str(body["window"]).lower()
+        from .capture import windows
+        hit = next((w for w in windows()
+                    if want in w["title"].lower() or want == w["id"].lower()), None)
+        if not hit:
+            raise HTTPException(400, detail=f"no window matching {body['window']!r} — GET /capture/record/targets")
+        geo = hit["geometry"]
+    name = body.get("name") or f"desktop-{int(time.time())}"
+    out = RENDERS / "captures" / f"{name}.mp4"
+    result = start(out, geometry=geo, seconds=body.get("seconds"),
+                   audio=bool(body.get("audio")), label=body.get("label") or name)
+    if not result.get("ok"):
+        raise HTTPException(409, detail=result)
+    return result
+
+
+@router.get("/capture/record/status")
+def record_status():
+    from .recorder import status
+    return status()
+
+
+@router.post("/capture/record/stop")
+def record_stop():
+    from .recorder import stop
+    result = stop()
+    if not result.get("ok"):
+        raise HTTPException(400, detail=result)
+    return result
+
+
+@router.post("/capture/record/forget")
+def record_forget():
+    from .recorder import forget
+    return forget()
 
 
 @router.get("/capture/deps")

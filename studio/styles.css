@@ -434,3 +434,12 @@ html, body {
 .review-pri { font-family: var(--mono); font-size: 10px; color: var(--amber); }
 .review-risk { font-size: 10.5px; color: var(--amber); }
 .review-raw { font-family: var(--mono); font-size: 10px; white-space: pre-wrap; color: var(--dim); }
+
+/* recorder: aim at a window, drive the app, stop */
+.cap-rec { border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); padding: 10px; display: grid; gap: 8px; }
+.cap-rec-row { display: grid; grid-template-columns: 1.4fr .9fr auto auto; gap: 8px; align-items: center; }
+.cap-rec-row select { min-width: 0; }
+.cap-audio { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); }
+.cap-rec .mono-dim { font-size: 10.5px; }
+.cap-rec-beat { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.btn.danger { border-color: #b4443a; color: #f0a49c; }
