@@ -170,3 +170,14 @@ def health():
     return JSONResponse({'ok': True,
                          'ffmpeg': edl._run(['ffmpeg', '-version']).returncode == 0,
                          'root': str(store.root())})
+
+
+@router.get('/version')
+def version():
+    """The build this tab is actually running: BUILD_INFO.json -> git -> plugin.yaml.
+
+    Read at request time from the same module the CLI prints, so the chip in the
+    header and `python3 -m video_studio.cli version` can never disagree.
+    """
+    from video_studio.version_stamp import as_dict
+    return JSONResponse({'build': as_dict()})

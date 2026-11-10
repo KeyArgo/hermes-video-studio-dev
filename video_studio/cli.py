@@ -10,12 +10,29 @@
     python3 -m hewn_cut.cli undo     project.json
     python3 -m hewn_cut.cli render   project.json out.mp4
     python3 -m hewn_cut.cli verify   out.mp4
+    python3 -m hewn_cut.cli --version
 """
 import json
 import os
 import sys
 
 from . import edl
+
+
+def version_line() -> str:
+    """`v1.0.0-dev.N · 2026-11-09 · 19f7a2c` — read from the build, never typed in.
+
+    Same module the header chip and /api/version read, so the line a user copies into
+    a bug report is the identity of the code that answered.
+    """
+    from .version_stamp import as_dict
+    info = as_dict()
+    parts = ["v" + info["version"]]
+    if info["commit_date"]:
+        parts.append(info["commit_date"][:10])
+    if info["commit"]:
+        parts.append(info["commit"][:8])
+    return " · ".join(parts) + (" · modified" if info["dirty"] else "")
 
 
 def _p(obj):
@@ -86,6 +103,8 @@ def main(argv=None):
         r = p.render(rest[1])
         _p({"rendered": os.path.abspath(rest[1]), "duration": r["duration"],
             "shippable": r["pass"], "failures": r["failures"], "checks": r["checks"]})
+    elif cmd in ("version", "--version", "-V"):
+        print(version_line())
     else:
         print(f"unknown command {cmd}")
         return 1

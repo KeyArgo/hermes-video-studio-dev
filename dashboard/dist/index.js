@@ -38,6 +38,29 @@
   function pct(t, total) { return Math.max(0, Math.min(100, (t / (total || 1)) * 100)) }
   function short(n) { return n >= 1024 ? (n / 1024).toFixed(1) + 'k' : String(n) }
 
+  // Copies only when the clipboard actually took the text: the chip's "copied" state
+  // is a claim about what happened, not a decoration.
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text)
+        return true
+      }
+    } catch (e) { /* fall through to the textarea */ }
+    try {
+      var area = document.createElement('textarea')
+      area.value = text
+      area.setAttribute('readonly', '')
+      area.style.position = 'fixed'
+      area.style.opacity = '0'
+      document.body.appendChild(area)
+      area.select()
+      var ok = document.execCommand('copy')
+      area.remove()
+      return ok
+    } catch (e) { return false }
+  }
+
   function api(path, opts) {
     return fetch(API + path, Object.assign({
       headers: { 'Content-Type': 'application/json' }
@@ -63,6 +86,14 @@
     '.hvs-tag{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--dim);',
     '  text-transform:uppercase;letter-spacing:.14em}',
     '.hvs-spacer{flex:1}',
+    '.hvs-ver{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--dim);',
+    '  border:1px solid var(--line);border-radius:3px;padding:2px 7px;cursor:copy;white-space:nowrap;letter-spacing:0}',
+    '.hvs-ver:hover{color:var(--ink);border-color:#2c333f}',
+    '.hvs-ver.dirty{color:#f0a13a;border-color:#4a3a1c}',
+    '.hvs-ver[data-copied="1"]{color:#34d399;border-color:#1f4a38}',
+    '.hvs-ver[data-copied="1"]::after{content:" · copied"}',
+    '.hvs-ver[data-copied="failed"]{color:#fca5a5;border-color:#4a2222}',
+    '.hvs-ver[data-copied="failed"]::after{content:" · copy failed"}',
     '.hvs-body{display:grid;grid-template-columns:252px minmax(0,1fr) 312px;min-height:0}',
     '.hvs-rail,.hvs-insp{background:var(--panel);border-right:1px solid var(--line);overflow:auto;min-height:0;padding:2px 0}',
     '.hvs-insp{border-right:0;border-left:1px solid var(--line)}',
@@ -144,13 +175,49 @@
     var root = el('div', { class: 'hvs' })
     host.appendChild(root)
 
-    var state = { projects: [], id: null, view: null, analyze: null, sel: null, busy: '', error: '', notice: '', mode: 'cut' }
+    var state = { projects: [], id: null, view: null, analyze: null, sel: null, busy: '', error: '', notice: '', mode: 'cut', ver: null }
 
     function redraw() {
       root.innerHTML = ''
       root.appendChild(renderTop())
       if (state.mode === 'films') root.appendChild(renderFilms())
       else root.appendChild(renderBody())
+    }
+
+    // The build this tab is running: /version -> BUILD_INFO.json -> live git -> plugin.yaml.
+    // Read at runtime; a version typed into this file would drift from the code answering.
+    function loadVersion() {
+      return api('/version').then(function (r) {
+        state.ver = r.build || { version: r.version }
+        redraw()
+      }).catch(function () { /* no guess beats a wrong number */ })
+    }
+
+    function versionChip() {
+      var b = state.ver
+      if (!b) return el('span', { class: 'hvs-ver hvs-tag', text: 'v…' })
+      var parts = ['v' + (b.version || 'unknown')]
+      if (b.commit_date) parts.push(String(b.commit_date).slice(0, 10))
+      if (b.commit_short || b.commit) parts.push((b.commit_short || b.commit).slice(0, 8))
+      var chip = el('span', {
+        class: 'hvs-ver' + (b.dirty ? ' dirty' : ''),
+        text: parts.join(' · ') + (b.dirty ? ' · modified' : ''),
+        title: [
+          'Video Studio ' + (b.version || 'unknown'),
+          b.commit ? 'commit ' + b.commit : 'no commit (installed copy)',
+          b.commit_date ? 'committed ' + b.commit_date : '',
+          b.built_at ? 'installed ' + b.built_at : '',
+          b.channel ? 'channel ' + b.channel : '',
+          b.source ? 'read from ' + b.source : '',
+          'click to copy this line'
+        ].filter(Boolean).join('\n')
+      })
+      chip.addEventListener('click', async function () {
+        var copied = await copyText('Video Studio ' + chip.textContent.trim())
+        chip.dataset.copied = copied ? '1' : 'failed'
+        setTimeout(function () { delete chip.dataset.copied }, 1400)
+      })
+      return chip
     }
 
     // ---------------- top bar
@@ -170,7 +237,8 @@
           }
         }),
         state.mode === 'cut' && state.view ? el('div', { class: 'hvs-tag', text: state.view.segments.length + ' segments · ' + state.view.captions.length + ' captions' }) : null,
-        state.busy ? el('div', { class: 'hvs-tag', text: state.busy + '…' }) : null
+        state.busy ? el('div', { class: 'hvs-tag', text: state.busy + '…' }) : null,
+        versionChip()
       ])
     }
 
@@ -744,6 +812,7 @@
     }
 
     // ---------------- boot
+    loadVersion()
     loadProjects().then(function () {
       if (state.projects.length) return open(state.projects[0].id)
     }).catch(function (e) {

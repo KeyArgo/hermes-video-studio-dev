@@ -162,7 +162,32 @@ html, body {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
+#status-text { flex: 1; min-width: 0; }
+
+/* The build you are actually running. Filled by showVersion() from /api/version —
+   a number typed into this file would drift from the code answering the requests. */
+.version-chip {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .02em;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 7px;
+  cursor: copy;
+  white-space: nowrap;
+  transition: color .15s ease, border-color .15s ease;
+}
+.version-chip:hover { color: var(--ink); border-color: #2a3341; }
+.version-chip.dirty { color: var(--amber); border-color: #4a3a1c; }
+.version-chip[data-copied="1"] { color: var(--ok); border-color: #1f4a38; }
+.version-chip[data-copied="1"]::after { content: " · copied"; }
+.version-chip[data-copied="failed"] { color: var(--bad); border-color: #4a2222; }
+.version-chip[data-copied="failed"]::after { content: " · copy failed"; }
 
 /* ----------------------------------------------------------- inspector */
 #inspector {
@@ -368,3 +393,10 @@ html, body {
 .prod-name b { font-size: 12.5px; }
 .prod-name .mono-dim { font-size: 10.5px; margin-top: 2px; }
 .prod-row .mono-dim { font-size: 10px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* build chip: version · date · commit, the line a user reads out in a bug report */
+.build-chip { font-family: var(--mono); font-size: 10px; letter-spacing: .02em; color: var(--dim);
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 9px; cursor: pointer;
+  white-space: nowrap; align-self: center; }
+.build-chip:hover { color: var(--ink); border-color: var(--accent); }
+.build-chip.dirty { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 55%, transparent); }

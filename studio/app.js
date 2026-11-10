@@ -229,7 +229,62 @@
     }
   }
 
+  // ---------------------------------------------------------- version chip
+  // One source: the server's own stamp (/api/version -> BUILD_INFO.json -> live git
+  // -> plugin.yaml). A number compiled into this file would drift from the code
+  // answering the requests.
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text)
+        return true
+      }
+    } catch (e) { /* fall through to the textarea */ }
+    try {
+      var area = document.createElement('textarea')
+      area.value = text
+      area.setAttribute('readonly', '')
+      area.style.position = 'fixed'
+      area.style.opacity = '0'
+      document.body.appendChild(area)
+      area.select()
+      var ok = document.execCommand('copy')
+      area.remove()
+      return ok
+    } catch (e) { return false }
+  }
+
+  function showVersion() {
+    var chip = $('app-version')
+    if (!chip) return
+    api('/version').then(function (data) {
+      var build = (data && data.build) || {}
+      var parts = ['v' + (build.version || 'unknown')]
+      if (build.commit_date) parts.push(String(build.commit_date).slice(0, 10))
+      if (build.commit_short || build.commit) parts.push((build.commit_short || build.commit).slice(0, 8))
+      chip.textContent = parts.join(' · ') + (build.dirty ? ' · modified' : '')
+      chip.classList.toggle('dirty', !!build.dirty)
+      chip.title = [
+        'Video Studio ' + (build.version || 'unknown'),
+        build.commit ? 'commit ' + build.commit : 'no commit (installed copy)',
+        build.commit_date ? 'committed ' + build.commit_date : '',
+        build.built_at ? 'installed ' + build.built_at : '',
+        build.channel ? 'channel ' + build.channel : '',
+        build.source ? 'read from ' + build.source : '',
+        'click to copy this line'
+      ].filter(Boolean).join('\n')
+      chip.onclick = async function () {
+        var line = 'Video Studio ' + chip.textContent.trim()
+        // Say "copied" only when something was copied: a badge that lies is worse than no badge.
+        var copied = await copyText(line)
+        chip.dataset.copied = copied ? '1' : 'failed'
+        setTimeout(function () { delete chip.dataset.copied }, 1400)
+      }
+    }).catch(function () { /* no guess beats a wrong number */ })
+  }
+
   $('btn-render').addEventListener('click', renderFilm)
   $('btn-gate').addEventListener('click', runGate)
+  showVersion()
   loadFilms()
 })()

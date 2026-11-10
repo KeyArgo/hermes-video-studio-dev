@@ -544,6 +544,14 @@ def studio_host():
         raise HTTPException(status_code=503, detail=f"studio host unavailable: {exc}") from None
 
 
+@router.get("/version")
+def version():
+    """The build stamp: release target, dev build number, commit and date."""
+    from . import build_info
+    info = build_info.read()
+    return {**info, "chip": build_info.chip()}
+
+
 @router.get("/neighbour/music-studio")
 def music_studio_url():
     """Where Music Studio is running, so the studio can hand the user over to it.

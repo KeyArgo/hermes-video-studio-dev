@@ -1,7 +1,7 @@
 {
   "name": "hewn-video-studio",
   "label": "Video Studio",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "tab": {
     "path": "/video-studio",
     "position": "end",

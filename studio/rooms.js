@@ -244,6 +244,25 @@
   //
   // Tracks are read from Music Studio's own store; the film keeps only a pointer
   // (track id, where to start, fades). Making music stays in the music room.
+  // ------------------------------------------------------------------- build
+  //
+  // The chip answers "which code am I looking at" without a terminal. Amber when the installed
+  // copy came from a dirty tree, click to copy the line into a bug report.
+  function loadBuildChip() {
+    var chip = $('build-chip')
+    if (!chip) return
+    api('/version').then(function (v) {
+      chip.textContent = v.chip
+      chip.classList.toggle('dirty', !!v.dirty)
+      chip.title = (v.commit || 'no commit') + '\nbuilt ' + (v.built_at || 'unknown')
+      chip.addEventListener('click', function () {
+        var line = v.chip
+        if (navigator.clipboard) navigator.clipboard.writeText(line)
+        status('Copied: ' + line)
+      })
+    }).catch(function () { chip.textContent = 'unversioned' })
+  }
+
   function loadMusic() {
     var list = $('music-list')
     var fid = window.__studioFilm
@@ -399,6 +418,7 @@
     var mc = $('btn-music-clear'); if (mc) mc.addEventListener('click', clearMusic)
     var om = $('btn-open-music'); if (om) om.addEventListener('click', openMusicStudio)
     var pr = $('btn-prod-refresh'); if (pr) pr.addEventListener('click', loadProduction)
+    loadBuildChip()
     var pick = $('file-input'); if (pick) pick.addEventListener('change', function () { upload(pick.files); pick.value = '' })
     var add = $('btn-add'); if (add) add.addEventListener('click', function () { if (pick) pick.click() })
     var grid = $('asset-grid')

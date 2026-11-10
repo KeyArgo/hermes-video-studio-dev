@@ -52,6 +52,29 @@ async function run(spec) {
     if (step.mouse) { await moveCursor(page, step.mouse[0], step.mouse[1]); continue; }
     if (step.scroll) { await page.mouse.wheel(0, step.scroll); await page.waitForTimeout(500); continue; }
     if (step.eval) { await page.evaluate(step.eval); await page.waitForTimeout(step.after || 600); continue; }
+    if (step.drive) {
+      // Feed a real envelope into a page that expects its host to push values: Aura's
+      // visualizer reads CSS variables the desktop shell normally sets.
+      await page.evaluate((d) => {
+        const root = document.documentElement;
+        d.vars.forEach((v) => root.style.setProperty(v.name, String(v.start ?? 0)));
+        const t0 = performance.now();
+        const frame = () => {
+          const ms = performance.now() - t0;
+          const i = Math.min(d.values.length - 1, Math.floor(ms / d.ms));
+          d.vars.forEach((v) => {
+            const arr = v.values || d.values;
+            const lo = v.min ?? 0, hi = v.high ?? 1;
+            const val = lo + (hi - lo) * (arr[i] ?? 0);
+            root.style.setProperty(v.name, val.toFixed(4));
+          });
+          if (ms < d.ms * d.values.length) requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      }, { values: step.drive.values, ms: step.drive.ms || 33, vars: step.drive.vars });
+      await page.waitForTimeout(step.drive.values.length * (step.drive.ms || 33) + 300);
+      continue;
+    }
     if (step.click) {
       const el = await page.$(step.click);
       if (!el) { console.error("missing selector: " + step.click); continue; }

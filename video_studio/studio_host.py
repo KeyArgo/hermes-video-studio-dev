@@ -42,6 +42,13 @@ def status():
     return {"ok": True, "plugin": "hewn-video-studio", "workspace": str(MOTION)}
 
 
+@app.get("/api/version")
+def version():
+    """The build behind this page. Same function the dashboard tab and CLI read."""
+    from video_studio.version_stamp import as_dict
+    return {"build": as_dict()}
+
+
 # Everything else under studio/ is served as-is. A mount (not one route per file) means a new
 # panel or script works the moment it is written, instead of 404ing until the host is edited.
 app.mount("/", StaticFiles(directory=str(STUDIO), html=True), name="studio")
