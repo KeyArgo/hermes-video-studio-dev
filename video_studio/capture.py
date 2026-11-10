@@ -87,6 +87,28 @@ def studio_walkthrough(url: str, out: Path) -> dict:
     return record(url, steps, out)
 
 
+def windows() -> list[dict]:
+    """Desktop windows with geometry, so a recording can be aimed at one app.
+
+    `wmctrl` lists EWMH windows; geometry is in root coordinates. On Wayland this only sees
+    XWayland clients, which is why the region is confirmed by the caller rather than assumed.
+    """
+    import shutil
+
+    if not shutil.which("wmctrl"):
+        return []
+    out = subprocess.run(["wmctrl", "-lG"], capture_output=True, text=True).stdout
+    found = []
+    for line in out.splitlines():
+        parts = line.split(None, 7)
+        if len(parts) < 8:
+            continue
+        hexid, desk, x, y, w, h, host, title = parts
+        found.append({"id": hexid, "x": int(x), "y": int(y), "w": int(w), "h": int(h),
+                      "title": title.strip(), "geometry": f"{w}x{h}+{x}+{y}"})
+    return found
+
+
 def desktop(out: Path, seconds: float = 10.0, region: str | None = None,
             fps: int = 30) -> dict:
     """Record the desktop itself — for anything that is not a web page.

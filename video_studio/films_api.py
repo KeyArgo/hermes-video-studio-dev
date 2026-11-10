@@ -453,6 +453,38 @@ def set_treatment(fid: str, body: dict):
             "skipped": skipped, "backup": str(backup)}
 
 
+@router.get("/capture/windows")
+def capture_windows():
+    """What could be filmed on this desktop, with geometry."""
+    from .capture import windows
+    return {"windows": windows()}
+
+
+@router.post("/capture/desktop")
+def capture_desktop(body: dict | None = None):
+    """Record the desktop (or one window's region) — for apps that are not web pages.
+
+    Refuses with the install command when `wf-recorder` is missing rather than returning an empty
+    file that looks like a successful recording.
+    """
+    from .capture import desktop as record_desktop, windows
+
+    body = body or {}
+    name = _clean(body.get("name") or "desktop", "capture name")
+    seconds = float(body.get("seconds", 10.0))
+    region = body.get("region")
+    if not region and body.get("window"):
+        match = [w for w in windows() if body["window"].lower() in w["title"].lower()]
+        if not match:
+            raise HTTPException(status_code=404, detail=f"no window matching {body['window']!r}")
+        region = match[0]["geometry"]
+    out = RENDERS / "captures" / f"{name}.mp4"
+    result = record_desktop(out, seconds=seconds, region=region)
+    if not result.get("ok"):
+        raise HTTPException(status_code=503, detail=result)
+    return {"capture": name, "region": region, **result}
+
+
 @router.post("/capture/run")
 def capture_run(body: dict):
     """Record a page being used. Returns a job: a capture is a minute, not a millisecond."""
