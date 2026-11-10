@@ -44,7 +44,7 @@
 
   // ------------------------------------------------------------------- rooms
   function show(room) {
-    ;['films', 'assets', 'generate', 'music'].forEach(function (r) {
+    ;['films', 'assets', 'generate', 'music', 'production'].forEach(function (r) {
       var view = $('room-' + r)
       if (view) view.hidden = r !== room
     })
@@ -54,6 +54,7 @@
     if (room === 'assets') loadAssets()
     if (room === 'generate') loadComfy()
     if (room === 'music') loadMusic()
+    if (room === 'production') loadProduction()
     if (room === 'timeline' && window.__studioLoadTimeline) window.__studioLoadTimeline()
   }
 
@@ -273,7 +274,7 @@
               btn.disabled = true
               api('/films/' + encodeURIComponent(fid) + '/music', { method: 'POST',
                 body: JSON.stringify({ track_id: t.id, start: 0, fade_in: 1.0, fade_out: 1.5 }) })
-                .then(function () { status('Bed set to “' + t.title + '”'); loadMusic() })
+                .then(function () { window.__studioTrack = t.id; status('Bed set to “' + t.title + '”'); loadMusic() })
                 .catch(function (e) { status('Could not set bed: ' + e.message); btn.disabled = false })
             })
             list.appendChild(el('div', { class: 'music-row' }, [
@@ -303,6 +304,58 @@
     api('/films/' + encodeURIComponent(fid) + '/music', { method: 'POST', body: JSON.stringify({ track_id: 'none' }) })
       .then(function () { status('Bed removed'); loadMusic() })
       .catch(function (e) { status('Could not clear: ' + e.message) })
+  }
+
+  // -------------------------------------------------------------- production
+  //
+  // The glue is a list, not a new plugin: each stage is an action that already exists, ordered
+  // so the next one has something real to work with.
+  var STAGES = [
+    { key: 'script', title: '1 · Beats', what: 'What the film says, in timed beats.',
+      run: function (fid) { return api('/script/' + encodeURIComponent(fid)) } },
+    { key: 'typography', title: '2 · Typed shots', what: 'The words, on a fixed brand system.',
+      run: function (fid) { return api('/script/' + encodeURIComponent(fid) + '/shots', { method: 'POST', body: JSON.stringify({ only_missing: true }) }) } },
+    { key: 'capture', title: '3 · Real footage', what: 'The product actually being used.',
+      run: function () { return api('/capture/run', { method: 'POST', body: JSON.stringify({ name: 'studio-walkthrough', walkthrough: true }) }) } },
+    { key: 'broll', title: '4 · Generated b-roll', what: 'Cinematic footage from MiniMax H3.',
+      run: function (fid) {
+        return api('/films/' + encodeURIComponent(fid)).then(function (film) {
+          var b = (film.beats || [])[0]; if (!b) throw new Error('no beats')
+          return api('/comfy/beat', { method: 'POST', body: JSON.stringify({ film_id: fid, beat_id: b.id }) })
+        })
+      } },
+    { key: 'stills', title: '5 · Stills', what: 'Generated frames, imported as assets.',
+      run: function () { return api('/stills/scan', { method: 'POST', body: JSON.stringify({ as_clip: true }) }) } },
+    { key: 'music', title: '6 · Music', what: 'A real track from Music Studio.',
+      run: function (fid) { var t = window.__studioTrack; if (!t) throw new Error('pick a track in Music first'); return api('/films/' + encodeURIComponent(fid) + '/music', { method: 'POST', body: JSON.stringify({ track_id: t }) }) } },
+    { key: 'drafts', title: '7 · Directions', what: 'Three cheap drafts, watched and judged.',
+      run: function (fid) { return api('/films/' + encodeURIComponent(fid) + '/drafts', { method: 'POST', body: JSON.stringify({}) }) } },
+    { key: 'cut', title: '8 · Cut', what: 'One cut, gated on hook, motion, audio, legibility.',
+      run: function (fid) { return api('/films/' + encodeURIComponent(fid) + '/assemble', { method: 'POST', body: '{}' }) } }
+  ]
+
+  function loadProduction() {
+    var body = $('prod-body'); if (!body) return
+    body.innerHTML = ''
+    var fid = window.__studioFilm
+    body.appendChild(el('p', { class: 'hint', text: fid ? 'Film: ' + fid : 'Pick a film in the rail first.' }))
+    STAGES.forEach(function (s) {
+      var out = el('span', { class: 'mono-dim', text: '' })
+      var btn = el('button', { class: 'btn small', text: 'Run' })
+      btn.disabled = !fid
+      btn.addEventListener('click', function () {
+        btn.disabled = true; out.textContent = 'running…'
+        status(s.title + ' — running')
+        Promise.resolve().then(function () { return s.run(fid) })
+          .then(function (r) { out.textContent = 'done: ' + JSON.stringify(r).slice(0, 110); status(s.title + ' — done') })
+          .catch(function (e) { out.textContent = 'refused: ' + e.message; status(s.title + ' — ' + e.message) })
+          .then(function () { btn.disabled = false })
+      })
+      body.appendChild(el('div', { class: 'prod-row' }, [
+        el('div', { class: 'prod-name' }, [el('b', { text: s.title }), el('div', { class: 'mono-dim', text: s.what })]),
+        out, btn
+      ]))
+    })
   }
 
   function upload(files) {
@@ -345,6 +398,7 @@
     var mr = $('btn-music-refresh'); if (mr) mr.addEventListener('click', loadMusic)
     var mc = $('btn-music-clear'); if (mc) mc.addEventListener('click', clearMusic)
     var om = $('btn-open-music'); if (om) om.addEventListener('click', openMusicStudio)
+    var pr = $('btn-prod-refresh'); if (pr) pr.addEventListener('click', loadProduction)
     var pick = $('file-input'); if (pick) pick.addEventListener('change', function () { upload(pick.files); pick.value = '' })
     var add = $('btn-add'); if (add) add.addEventListener('click', function () { if (pick) pick.click() })
     var grid = $('asset-grid')

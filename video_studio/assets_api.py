@@ -267,6 +267,61 @@ def post_scan(body: dict | None = None):
     return scan(folders)
 
 
+@router.post("/stills/scan")
+def post_stills_scan(body: dict | None = None):
+    """Ingest every image in a stills folder — where generated frames are dropped.
+
+    An image model is not part of this plugin, so the hand-off is a folder: generate stills
+    anywhere, save them here, press the button, and each becomes a normal asset (and can be
+    turned into a slow push clip).
+    """
+    from .films_api import MOTION
+
+    body = body or {}
+    folder = Path(str(body.get("dir") or MOTION / "assets" / "stills")).expanduser()
+    if not folder.is_dir():
+        return {"dir": str(folder), "imported": [], "failed": [],
+                "hint": "create the folder and put images in it"}
+    made, failed = [], []
+    for src in sorted(folder.iterdir()):
+        if src.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"):
+            continue
+        try:
+            rec = ingest(src)
+            if body.get("as_clip"):
+                rec["clip"] = still_clip(rec["id"], float(body.get("clip_seconds", 4.0)))
+            made.append({"id": rec["id"], "name": rec["name"], "new": rec["new"],
+                         "clip": bool(rec.get("clip"))})
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"name": src.name, "error": str(exc)})
+    return {"dir": str(folder), "imported": made, "failed": failed}
+
+
+@router.post("/assets/import")
+def post_import(body: dict):
+    """Bring in a file that already exists on disk — a generated still, a screen capture.
+
+    Image models do not live in this plugin (the ComfyUI box has no image checkpoint installed),
+    so stills are produced by whatever tool the user has and land here by path. The intake is the
+    same one every other asset goes through: content hash, proxy, thumbnail, still -> moving clip.
+    """
+    paths = body.get("paths") or ([body["path"]] if body.get("path") else [])
+    if not paths:
+        raise HTTPException(400, detail="path or paths is required")
+    made, failed = [], []
+    for raw in paths:
+        src = Path(str(raw)).expanduser()
+        try:
+            rec = ingest(src)
+            if body.get("as_clip") and rec.get("kind") == "image":
+                rec["clip"] = still_clip(rec["id"], float(body.get("clip_seconds", 4.0)))
+            made.append({"id": rec["id"], "kind": rec["kind"], "new": rec["new"],
+                         "name": rec["name"], "clip": bool(rec.get("clip"))})
+        except Exception as exc:  # noqa: BLE001
+            failed.append({"path": str(src), "error": str(exc)})
+    return {"imported": made, "failed": failed}
+
+
 @router.get("/assets/{asset_id}")
 def get_asset(asset_id: str):
     return find(asset_id)

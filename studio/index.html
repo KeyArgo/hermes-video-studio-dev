@@ -17,6 +17,7 @@
       <button class="room" data-room="timeline">Timeline</button>
       <button class="room" data-room="generate">Generate</button>
       <button class="room" data-room="music">Music</button>
+      <button class="room" data-room="production">Production</button>
     </nav>
     <div class="rail-label">Films</div>
     <div id="films" class="films"></div>
@@ -138,6 +139,25 @@
         <span class="mono-dim">Make or re-take music there, then press Read library — nothing is copied, the film
         points at the take. Video Studio never writes to that store.</span>
         <button id="btn-open-music" class="btn small">Open Music Studio →</button>
+      </div>
+    </div>
+
+    <div id="room-production" class="room-view" hidden>
+      <div class="room-head">
+        <div>
+          <h2>Production</h2>
+          <div class="sub">Every stage of one film, in the order it has to happen.</div>
+        </div>
+        <div class="actions"><button id="btn-prod-refresh" class="btn">Refresh</button></div>
+      </div>
+      <div id="prod-body" class="prod-body"></div>
+      <div class="music-promo">
+        <b>Why the stages are in this order</b>
+        <span class="mono-dim">A model writing HTML is good at wording and structure and bad at
+        proof: it cannot show a product working, cannot film anything, cannot compose music, and
+        drifts on design across shots. So the pipeline puts real footage, generated b-roll,
+        stills and a real track around the typed words — and the gate measures what text cannot
+        promise.</span>
       </div>
     </div>
 

@@ -157,7 +157,8 @@ def get_film(fid: str):
             "line": b.get("line"),
         })
     return {"id": fid, "title": data.get("title") or fid,
-            "total": data.get("total"), "beats": beats, "renders": _rendered(fid)}
+            "total": data.get("total"), "beats": beats, "renders": _rendered(fid),
+            "treatment": data.get("treatment"), "music": data.get("music")}
 
 
 @router.get("/films/{fid}/beats/{bid}/source")
@@ -358,6 +359,78 @@ def make_drafts(fid: str, body: dict | None = None):
 
     threading.Thread(target=runner, daemon=True).start()
     return {"job": jid, "variants": names, "seconds": total}
+
+
+@router.post("/films/{fid}/treatment")
+def set_treatment(fid: str, body: dict):
+    """Promote a draft's treatment onto the film itself.
+
+    Drafts are experiments; this is the decision. The previous compositions are copied to
+    `film/.backup/<film>-<timestamp>/` first, because "revert" should never depend on memory.
+    """
+    from . import drafts as draft_mod
+
+    name = (body or {}).get("treatment") or (body or {}).get("name")
+    if name not in draft_mod.VARIANTS:
+        raise HTTPException(status_code=400,
+                            detail=f"unknown treatment {name!r}; known: {', '.join(draft_mod.VARIANTS)}")
+    variant = draft_mod.VARIANTS[name]
+    data = _load(fid)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    backup = FILM_DIR / ".backup" / f"{fid}-{stamp}"
+    changed, skipped = [], []
+    for beat in data.get("beats") or []:
+        src_rel = beat.get("src") or f"compositions/{beat['id']}.html"
+        src = (FILM_DIR / src_rel).resolve()
+        if not src.is_file():
+            skipped.append(beat["id"])
+            continue
+        backup.mkdir(parents=True, exist_ok=True)
+        (backup / src.name).write_text(src.read_text())
+        html = draft_mod._repalette(src.read_text(), variant)
+        marker = (variant["css"].strip().splitlines() or [""])[0]
+        if variant["css"] and marker and marker not in html and "</style>" in html:
+            html = html.replace("</style>", variant["css"] + "  </style>", 1)
+        src.write_text(html)
+        changed.append(beat["id"])
+    data["treatment"] = name
+    _save(fid, data)
+    return {"film": fid, "treatment": name, "changed": changed,
+            "skipped": skipped, "backup": str(backup)}
+
+
+@router.post("/capture/run")
+def capture_run(body: dict):
+    """Record a page being used. Returns a job: a capture is a minute, not a millisecond."""
+    from .capture import record as do_record, studio_walkthrough
+
+    url = (body or {}).get("url") or "http://127.0.0.1:36659/"
+    name = _clean((body or {}).get("name") or "capture", "capture name")
+    out = RENDERS / "captures" / f"{name}.mp4"
+    steps = (body or {}).get("steps")
+    walkthrough = bool((body or {}).get("walkthrough"))
+
+    jid = uuid.uuid4().hex[:12]
+    with _lock:
+        _jobs[jid] = {"id": jid, "kind": "capture", "state": "running",
+                      "started": time.time(), "tail": ""}
+
+    def work():
+        if walkthrough or not steps:
+            return studio_walkthrough(url, out)
+        return do_record(url, steps, out)
+
+    def runner():
+        try:
+            result = work()
+            with _lock:
+                _jobs[jid].update({"state": "done", "ok": True, "result": result})
+        except Exception as exc:  # noqa: BLE001
+            with _lock:
+                _jobs[jid].update({"state": "failed", "ok": False, "tail": str(exc)})
+
+    threading.Thread(target=runner, daemon=True).start()
+    return {"job": jid, "output": str(out), "url": url}
 
 
 @router.get("/films/{fid}/drafts")

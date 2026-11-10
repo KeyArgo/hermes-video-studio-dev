@@ -36,6 +36,9 @@ Hard requirements:
 - EVERY tween must carry an explicit time position as its last argument (`, 0` for "start at
   zero"). A tween without a position is appended after the previous one, which silently shifts
   all motion past the end of the shot — this produced static seconds in practice.
+- The first frame must already show the headline: no opacity-0 entrance on text. A fade-in at t=0 puts an empty frame at the top of the film.
+- The FIRST FRAME must already show the headline. No opacity-0 entrance on text: a fade-in
+  at t=0 puts an empty frame at the top of the film, which fails the hook check.
 - Motion must continue for the WHOLE {seconds}s: a slow persistent background move (a blurred
   orb, a grid drift, a gradient sweep) plus one entrance. Never leave a static stretch.
 - Type: sizes >= 34px. No text may overflow its container. Max 12 words of headline.

@@ -24,14 +24,14 @@ VARIANTS: dict[str, dict] = {
     },
     "cinematic": {
         "label": "Cinematic — letterbox, vignette, unhurried",
-        "accent": "#8fb6ff", "bg": "#07080a", "ink": "#f1f3f5", "dim": "#7c848e",
+        "accent": "#8fb6ff", "bg": "#0c0f14", "ink": "#f4f6f8", "dim": "#8892a0",
         "css": """
     /* letterbox: the frame stops being a slide and starts being a film */
     #root::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 90;
-      box-shadow: inset 0 0 220px 60px rgba(0,0,0,.85); }
-    #root::after { content: ""; position: fixed; left: 0; right: 0; height: 6.2%;
+      box-shadow: inset 0 0 150px 20px rgba(0,0,0,.62); }
+    #root::after { content: ""; position: fixed; left: 0; right: 0; height: 4.8%;
       background: #000; z-index: 91; pointer-events: none;
-      top: 0; box-shadow: 0 93.8vh 0 0 #000; }
+      top: 0; box-shadow: 0 95.2vh 0 0 #000; }
 """,
     },
     "kinetic": {
