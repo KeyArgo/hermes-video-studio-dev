@@ -453,6 +453,23 @@ def set_treatment(fid: str, body: dict):
             "skipped": skipped, "backup": str(backup)}
 
 
+@router.get("/capture/deps")
+def capture_deps():
+    """What is installed, what is missing, and when the missing piece matters."""
+    from .capture import deps
+    return deps()
+
+
+@router.post("/capture/install")
+def capture_install(body: dict | None = None):
+    """Offer to install the desktop recorder — quietly if allowed, else via a system prompt."""
+    from .capture import install_desktop_recorder
+    result = install_desktop_recorder(use_prompt=bool((body or {}).get("prompt", True)))
+    if not result.get("ok"):
+        return {"ok": False, **result}
+    return result
+
+
 @router.get("/capture/windows")
 def capture_windows():
     """What could be filmed on this desktop, with geometry."""
@@ -574,6 +591,103 @@ def studio_host():
         return ensure_host()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=503, detail=f"studio host unavailable: {exc}") from None
+
+
+@router.get("/models")
+def list_models():
+    """Every model this studio can ask, with a live reachability check."""
+    from .review import load_models, probe
+    models = load_models(MOTION)
+    return {"models": [{**m, "status": probe(m)} for m in models]}
+
+
+@router.post("/review")
+def review_moment(body: dict):
+    """Ask a model what is wrong with ONE moment, with measurements and the shot's source.
+
+    Everything the model is given is measured or quoted: nothing is described to it in
+    adjectives it could have written itself.
+    """
+    from . import review as rv
+
+    body = body or {}
+    fid = _clean(body.get("film") or "", "film")
+    at = float(body.get("time", 0.0))
+    note = (body.get("note") or "").strip()
+    model_id = body.get("model") or "deepseek-lane"
+    want_image = bool(body.get("image", True))
+
+    data = _load(fid)
+    video = RENDERS / f"{fid}-final.mp4"
+    if not video.is_file():
+        video = RENDERS / f"{fid}-raw.mp4"
+    if not video.is_file():
+        raise HTTPException(status_code=404, detail=f"no render for {fid} — assemble the cut first")
+
+    # which beat is this moment inside?
+    t = 0.0
+    beat = None
+    for b in data.get("beats") or []:
+        d = float(b.get("duration") or 0)
+        if t <= at < t + d:
+            beat = {**b, "_start": t}
+            break
+        t += d
+    if beat is None:
+        beat = {**(data.get("beats") or [{}])[-1], "_start": max(0.0, at)}
+
+    src_path = FILM_DIR / (beat.get("src") or f"compositions/{beat.get('id')}.html")
+    source = src_path.read_text() if src_path.is_file() else "(this beat has no composition source)"
+    if len(source) > 9000:
+        source = source[:9000] + "\n… (truncated)"
+
+    motion = rv.motion_profile(video)
+    stats = rv.frame_stats(video, at)
+    around = motion[max(0, int(at) - 1): int(at) + 2] if motion else []
+
+    frame = None
+    if want_image:
+        frame = rv.grab_frame(video, at, RENDERS / "reviews" / f"{fid}-{at:.2f}s.jpg")
+
+    model = rv.find_model(model_id, MOTION)
+    prompt = rv.PROMPT.format(
+        title=data.get("title") or fid,
+        seconds=float(data.get("total") or 0),
+        beats=len(data.get("beats") or []),
+        beat=beat.get("id", "?"),
+        beat_seconds=float(beat.get("duration") or 0),
+        beat_start=float(beat.get("_start") or 0),
+        shot_note=(beat.get("shot") or beat.get("line") or "")[:400],
+        at=at, note=note or "(no note — review the moment as it stands)",
+        motion=", ".join(f"{v}%/s" for v in around) or "unmeasured",
+        luma=stats.get("luma", 0), contrast=stats.get("contrast", 0),
+        colour=stats.get("colour", 0), edges=stats.get("edges", 0),
+        gate=_gate_summary(fid, video),
+        source=source,
+    )
+    answer = rv.ask(model, prompt, image=frame if model.get("vision") else None)
+    payload = rv.parse_json(answer.get("text", "")) if answer.get("ok") else None
+    return {"film": fid, "at": at, "beat": beat.get("id"), "note": note,
+            "model": model_id, "measurements": {**stats, "motion_around": around},
+            "frame": str(frame) if frame else None,
+            "image_sent": answer.get("image_sent", False),
+            "ok": answer.get("ok"), "error": answer.get("error"),
+            "review": payload, "raw": (answer.get("text") or "")[:2000]}
+
+
+def _gate_summary(fid: str, video: Path) -> str:
+    try:
+        r = subprocess.run(["python3", "-c",
+                            "import json,sys;sys.path.insert(0,%r);import gate;"
+                            "f=sys.argv[1];print(json.dumps(gate.verdict([gate.check_hook(f),"
+                            "gate.check_motion(f),gate.check_audio(f),gate.check_legibility(%r)])))"
+                            % (str(MOTION / "tools"), str(FILM_DIR)), str(video)],
+                           capture_output=True, text=True, timeout=300)
+        v = json.loads(r.stdout.strip().splitlines()[-1])
+        return "; ".join(f"{c['check']} {'pass' if c['pass'] else 'FAIL'} ({c['detail']})"
+                         for c in v.get("checks", []))
+    except Exception:  # noqa: BLE001
+        return "unavailable"
 
 
 @router.get("/version")

@@ -140,3 +140,75 @@ def desktop(out: Path, seconds: float = 10.0, region: str | None = None,
         return {"ok": False, "error": "capture produced no file",
                 "stderr": (proc.stderr.read() if proc.stderr else "")[-300:]}
     return {"ok": True, "output": str(out), "seconds": _seconds(out), "fps": fps}
+
+
+# ------------------------------------------------------------------ dependencies
+#
+# Browser capture needs nothing beyond Node + Playwright. Desktop capture needs a recorder that
+# speaks the compositor's screencopy protocol, and installing system packages needs privilege —
+# which this plugin will never hold. So the studio *reports* and *offers*, and never pretends.
+
+PKG = {
+    "zypper": "sudo zypper install wf-recorder",     # openSUSE
+    "apt-get": "sudo apt install wf-recorder",       # Debian/Ubuntu
+    "pacman": "sudo pacman -S wf-recorder",          # Arch
+    "dnf": "sudo dnf install wf-recorder",           # Fedora
+}
+
+
+def deps() -> dict:
+    """What desktop capture needs here, what is missing, and how it could be installed."""
+    import shutil
+
+    pm = next((p for p in PKG if shutil.which(p)), None)
+    has_rec = shutil.which("wf-recorder")
+    can_sudo = subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0 \
+        if shutil.which("sudo") else False
+    has_pkexec = bool(shutil.which("pkexec"))
+    return {
+        "browser": {"ready": True, "why": "Playwright is bundled; nothing to install"},
+        "desktop": {
+            "ready": bool(has_rec),
+            "recorder": has_rec or None,
+            "package_manager": pm,
+            "command": PKG.get(pm) if pm else "install wf-recorder with your distribution's package manager",
+            "can_install_quietly": can_sudo,
+            "can_install_with_prompt": has_pkexec,
+            "session": {"wayland": bool(__import__("os").environ.get("WAYLAND_DISPLAY")),
+                        "x11": bool(__import__("os").environ.get("DISPLAY"))},
+        },
+        "when_useful": [
+            "an app that is not a web page: a native window, an Electron pane, a game rendered inside the shell",
+            "a visualiser or overlay that draws onto the desktop (Aura), which has no URL to open",
+            "a real end-to-end session: opening an app, clicking through it, showing the whole screen",
+        ],
+        "when_not_needed": [
+            "anything with a URL — the studio itself, a web dashboard, a game page — browser capture is cleaner: 1080p, deterministic, and shows no other windows",
+        ],
+    }
+
+
+def install_desktop_recorder(use_prompt: bool = False) -> dict:
+    """Try to install wf-recorder. Quiet sudo first, then a desktop authorisation prompt.
+
+    Returns what happened. Never invents success: the binary is re-checked afterwards.
+    """
+    import shutil
+
+    info = deps()
+    if info["desktop"]["ready"]:
+        return {"ok": True, "already": True, "recorder": info["desktop"]["recorder"]}
+    command = info["desktop"]["command"]
+    attempts = []
+    if info["desktop"]["can_install_quietly"]:
+        attempts.append(["sudo", "-n", "sh", "-c", command.replace("sudo ", "", 1)])
+    if use_prompt and info["desktop"]["can_install_with_prompt"]:
+        attempts.append(["pkexec", "sh", "-c", command.replace("sudo ", "", 1)])
+    for cmd in attempts:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        attempts[-1] = {"cmd": " ".join(cmd[:3]), "rc": r.returncode, "tail": (r.stdout + r.stderr)[-300:]}
+        if r.returncode == 0 and shutil.which("wf-recorder"):
+            return {"ok": True, "installed": True, "command": command}
+    return {"ok": False, "attempted": attempts,
+            "needs": "run this in a terminal: " + command,
+            "hint": "the studio cannot elevate itself; a password prompt or a terminal is required"}

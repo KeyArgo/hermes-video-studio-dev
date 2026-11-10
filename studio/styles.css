@@ -400,3 +400,37 @@ html, body {
   white-space: nowrap; align-self: center; }
 .build-chip:hover { color: var(--ink); border-color: var(--accent); }
 .build-chip.dirty { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 55%, transparent); }
+
+/* footage sources: what can be filmed here, and what is missing */
+.cap-panel { margin: 8px 22px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.cap-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 8px; }
+.cap-head h3 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+.cap-head .mono-dim.warn { color: var(--amber); }
+.cap-body { padding: 0 14px 14px; display: grid; gap: 8px; }
+.cap-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+  padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); }
+.cap-row b { font-size: 12px; } .cap-row .mono-dim { font-size: 10.5px; margin-top: 2px; }
+.cap-ok { font-family: var(--mono); font-size: 10px; color: #4ade80; }
+.cap-missing { font-family: var(--mono); font-size: 10px; color: var(--amber); }
+.cap-actions { display: flex; gap: 8px; }
+.cap-why { font-size: 11px; color: var(--dim); line-height: 1.55; }
+.cap-why b { color: var(--ink); font-weight: 600; display: block; margin: 6px 0 3px; }
+.cap-why ul { margin: 0 0 4px 16px; }
+
+/* review: point at a moment, ask a model what should change */
+.review-panel { margin: 0 22px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.review-head { display: flex; justify-content: space-between; align-items: center; padding: 11px 13px 7px; }
+.review-head h3 { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+.review-controls { display: grid; grid-template-columns: 190px 1fr auto; gap: 8px; padding: 0 13px 10px; }
+.review-model, .review-note { font: inherit; font-size: 11.5px; color: var(--ink); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; }
+.review-out { padding: 0 13px 12px; display: grid; gap: 8px; }
+.review-diagnosis b { font-size: 12.5px; display: block; margin-bottom: 3px; }
+.review-diagnosis .mono-dim { font-size: 10.5px; line-height: 1.5; }
+.review-change { display: grid; grid-template-columns: 30px 1fr; gap: 10px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); font-size: 11.5px; }
+.review-change b { font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+.review-change .mono-dim { font-size: 10px; margin-top: 3px; }
+.review-pri { font-family: var(--mono); font-size: 10px; color: var(--amber); }
+.review-risk { font-size: 10.5px; color: var(--amber); }
+.review-raw { font-family: var(--mono); font-size: 10px; white-space: pre-wrap; color: var(--dim); }

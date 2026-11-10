@@ -54,7 +54,7 @@
     if (room === 'assets') loadAssets()
     if (room === 'generate') loadComfy()
     if (room === 'music') loadMusic()
-    if (room === 'production') loadProduction()
+    if (room === 'production') { loadProduction(); loadCaptureDeps() }
     if (room === 'timeline' && window.__studioLoadTimeline) window.__studioLoadTimeline()
   }
 
@@ -353,6 +353,113 @@
       run: function (fid) { return api('/films/' + encodeURIComponent(fid) + '/assemble', { method: 'POST', body: '{}' }) } }
   ]
 
+  // Browser capture needs nothing; desktop capture needs a recorder, and the studio cannot
+  // install system packages itself — it explains, offers, and re-checks afterwards.
+  function loadCaptureDeps() {
+    var body = $('cap-body'), state = $('cap-state')
+    if (!body) return
+    body.innerHTML = ''
+    api('/capture/deps').then(function (d) {
+      var desk = d.desktop || {}
+      state.textContent = desk.ready ? 'desktop ready' : 'desktop unavailable'
+      state.classList.toggle('warn', !desk.ready)
+      body.appendChild(el('div', { class: 'cap-row' }, [
+        el('div', {}, [el('b', { text: 'Browser capture' }),
+          el('div', { class: 'mono-dim', text: d.browser.why })]),
+        el('span', { class: 'cap-ok', text: 'ready' })
+      ]))
+      var actions = el('div', { class: 'cap-actions' })
+      if (!desk.ready) {
+        var install = el('button', { class: 'btn small', text: 'Install wf-recorder' })
+        install.addEventListener('click', function () {
+          install.disabled = true
+          status('Asking the system for permission to install wf-recorder…')
+          api('/capture/install', { method: 'POST', body: JSON.stringify({ prompt: true }) })
+            .then(function (r) {
+              if (r.ok) { status('wf-recorder installed'); loadCaptureDeps() }
+              else { status(r.needs || r.hint || 'install needs a terminal'); install.disabled = false }
+            })
+            .catch(function (e) { status('Install refused: ' + e.message); install.disabled = false })
+        })
+        var copy = el('button', { class: 'btn small', text: 'Copy command' })
+        copy.addEventListener('click', function () {
+          if (navigator.clipboard) navigator.clipboard.writeText(desk.command)
+          status('Copied: ' + desk.command)
+        })
+        actions.appendChild(install); actions.appendChild(copy)
+      }
+      body.appendChild(el('div', { class: 'cap-row' }, [
+        el('div', {}, [el('b', { text: 'Desktop capture' }),
+          el('div', { class: 'mono-dim', text: desk.ready ? ('recorder: ' + desk.recorder)
+            : 'needs a recorder (' + (desk.package_manager || 'package manager') + ') — ' + desk.command })]),
+        el('span', { class: desk.ready ? 'cap-ok' : 'cap-missing', text: desk.ready ? 'ready' : 'missing' })
+      ]))
+      if (actions.childNodes.length) body.appendChild(actions)
+      body.appendChild(el('div', { class: 'cap-why' }, [
+        el('b', { text: 'When desktop capture is the right tool' }),
+        el('ul', {}, (d.when_useful || []).map(function (x) { return el('li', { text: x }) })),
+        el('b', { text: 'When it is not' }),
+        el('ul', {}, (d.when_not_needed || []).map(function (x) { return el('li', { text: x }) }))
+      ]))
+    }).catch(function (e) { body.appendChild(el('p', { class: 'hint', text: 'deps failed: ' + e.message })) })
+  }
+
+  // ------------------------------------------------------------------ review
+  //
+  // The player's own timestamp is the pointer: stop where it looks wrong, type what feels wrong,
+  // and the model gets that frame's measurements plus the shot's source.
+  function loadReviewModels() {
+    var sel = $('review-model')
+    if (!sel) return
+    api('/models').then(function (r) {
+      sel.innerHTML = ''
+      ;(r.models || []).forEach(function (m) {
+        var opt = el('option', { value: m.id, text: m.label + (m.status && m.status.up ? '' : ' — offline') })
+        if (!(m.status && m.status.up)) opt.disabled = true
+        sel.appendChild(opt)
+      })
+    }).catch(function () {})
+  }
+
+  function runReview() {
+    var fid = window.__studioFilm
+    var player = $('player')
+    var note = ($('review-note') || {}).value || ''
+    var model = ($('review-model') || {}).value || 'deepseek-lane'
+    var out = $('review-out')
+    if (!fid || !out) { status('Pick a film first'); return }
+    var at = player ? (player.currentTime || 0) : 0
+    out.innerHTML = ''
+    out.appendChild(el('p', { class: 'hint', text: 'Asking ' + model + ' about ' + at.toFixed(1) + 's…' }))
+    status('Reviewing ' + at.toFixed(1) + 's with ' + model)
+    api('/review', { method: 'POST', body: JSON.stringify({ film: fid, time: at, note: note, model: model }) })
+      .then(function (r) {
+        out.innerHTML = ''
+        if (!r.ok) { out.appendChild(el('p', { class: 'hint', text: 'model error: ' + r.error })); return }
+        var rev = r.review
+        if (!rev) {
+          out.appendChild(el('pre', { class: 'review-raw', text: r.raw || '(no JSON returned)' }))
+          return
+        }
+        out.appendChild(el('div', { class: 'review-diagnosis' }, [
+          el('b', { text: rev.diagnosis || '' }),
+          el('div', { class: 'mono-dim', text: (rev.evidence || []).join(' · ') })
+        ]))
+        ;(rev.changes || []).forEach(function (c) {
+          out.appendChild(el('div', { class: 'review-change' }, [
+            el('span', { class: 'review-pri', text: '#' + (c.priority || 1) }),
+            el('div', {}, [el('b', { text: c.target || '' }), el('div', { text: c.change || '' }),
+                           el('div', { class: 'mono-dim', text: c.why || '' })])
+          ]))
+        })
+        if ((rev.keep || []).length) out.appendChild(el('div', { class: 'mono-dim', text: 'keep: ' + rev.keep.join(' · ') }))
+        if (rev.risk) out.appendChild(el('div', { class: 'review-risk', text: 'risk: ' + rev.risk }))
+        out.appendChild(el('div', { class: 'mono-dim', text: (r.image_sent ? 'frame sent' : 'frame not sent (model is text-only)')
+          + ' · luma ' + r.measurements.luma + ' · motion ' + (r.measurements.motion_around || []).join('/') + '%' }))
+      })
+      .catch(function (e) { out.innerHTML = ''; out.appendChild(el('p', { class: 'hint', text: e.message })) })
+  }
+
   function loadProduction() {
     var body = $('prod-body'); if (!body) return
     body.innerHTML = ''
@@ -419,6 +526,12 @@
     var om = $('btn-open-music'); if (om) om.addEventListener('click', openMusicStudio)
     var pr = $('btn-prod-refresh'); if (pr) pr.addEventListener('click', loadProduction)
     loadBuildChip()
+    loadReviewModels()
+    var rv = $('btn-review'); if (rv) rv.addEventListener('click', runReview)
+    var pl = $('player')
+    if (pl) pl.addEventListener('timeupdate', function () {
+      var at = $('review-at'); if (at) at.textContent = 'at ' + (pl.currentTime || 0).toFixed(1) + 's'
+    })
     var pick = $('file-input'); if (pick) pick.addEventListener('change', function () { upload(pick.files); pick.value = '' })
     var add = $('btn-add'); if (add) add.addEventListener('click', function () { if (pick) pick.click() })
     var grid = $('asset-grid')
