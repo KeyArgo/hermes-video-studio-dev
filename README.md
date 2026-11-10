@@ -123,6 +123,37 @@ Music Studio links back the other way: its studio has a **Cut a video →** butt
 plugin's running host and opens it. Both sides discover each other's port from the other's
 `studio-host.json`, so moving either one does not break the link.
 
+## Desktop footage — optional, and explained in place
+
+Some of what you want to show is not a web page: a native window, a visualiser drawn onto the
+desktop, a whole session with the app you are demoing. The studio films everything with a URL using
+Playwright; for the rest it needs a screen recorder on Wayland.
+
+`wf-recorder` is that recorder. The studio never installs system packages silently and never asks
+for a password itself — it offers three paths, in this order:
+
+1. a quiet `sudo -n` attempt, when the machine allows it;
+2. a normal system password dialog via `pkexec`;
+3. the exact command for your distribution, with a copy button.
+
+The Production room's **Footage sources** panel shows whether the recorder is present, what it
+would be used for, and when it is the wrong tool (anything with a URL — browser capture is cleaner,
+1080p, and shows no other windows).
+
+Once it is installed the recording is a first-class source, not a file on disk:
+
+- **aim** it at the whole screen or at a specific window (window list comes from `wmctrl`);
+- **record** with an optional auto-stop (the host owns the timer, so closing the page cannot leave
+  a recorder filling the disk);
+- **stop** → the file is probed (a killed recorder has no moov atom and is reported as broken, not
+  as done), then ingested into **Assets** like any other footage, with proxy and thumbnail;
+- **use it**: *Use in beat* cuts it to the selected beat's duration, pans and dresses it, and writes
+  it where assembly expects a shot — or call
+  `POST /films/{id}/beats/{bid}/footage {"capture": "last"}`.
+
+Routes: `GET /capture/record/targets`, `POST /capture/record/start`, `GET /capture/record/status`,
+`POST /capture/record/stop`, `POST /capture/record/forget`.
+
 ## Drafts before commitment
 
 `POST /films/{id}/drafts` renders three whole directions of a film — *quiet*, *cinematic*

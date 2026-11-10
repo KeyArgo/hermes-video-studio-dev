@@ -131,5 +131,58 @@ class RecorderTest(unittest.TestCase):
         self.assertIsNotNone(last)
 
 
+class RecordRouteTest(unittest.TestCase):
+    """The HTTP surface, exercised in-process: start → status → stop → footage "last"."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        bindir = root / "bin"; bindir.mkdir()
+        (bindir / "wf-recorder").write_text(FAKE); (bindir / "wf-recorder").chmod(0o755)
+        self.old_path = os.environ["PATH"]
+        os.environ["PATH"] = str(bindir) + os.pathsep + self.old_path
+        os.environ["HEWN_VIDEO_STUDIO_DATA"] = str(root / "data")
+        os.environ["HEWN_ASSETS_LIBRARY"] = str(root / "library")
+        os.environ["VIDEO_STUDIO_MOTION"] = str(root / "motion")
+        for mod in ("video_studio.recorder", "video_studio.capture", "video_studio.films_api",
+                    "video_studio.assets_api"):
+            sys.modules.pop(mod, None)
+
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from video_studio import films_api
+        app = FastAPI(); app.include_router(films_api.router, prefix="/api")
+        self.client = TestClient(app)
+        self.root = root
+
+    def tearDown(self):
+        os.environ["PATH"] = self.old_path
+        for k in ("HEWN_VIDEO_STUDIO_DATA", "HEWN_ASSETS_LIBRARY", "VIDEO_STUDIO_MOTION"):
+            os.environ.pop(k, None)
+        self.tmp.cleanup()
+
+    def test_routes_drive_a_recording_end_to_end(self):
+        r = self.client.post("/api/capture/record/start", json={"name": "route", "seconds": 2,
+                                                               "geometry": "640x360+0+0"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()["ok"])
+        st = self.client.get("/api/capture/record/status").json()
+        self.assertTrue(st["recording"], st)
+        import time; time.sleep(2.4)
+        res = self.client.post("/api/capture/record/stop")
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertTrue(body["ok"], body)
+        self.assertGreater(body["seconds"], 0.4)
+
+    def test_targets_route_lists_windows(self):
+        r = self.client.get("/api/capture/record/targets")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("windows", r.json())
+
+    def test_status_is_idle_before_anything_runs(self):
+        self.assertEqual(self.client.get("/api/capture/record/status").json()["state"], "idle")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

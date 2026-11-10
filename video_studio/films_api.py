@@ -475,7 +475,6 @@ def record_targets():
 def record_start(body: dict):
     """Start a desktop recording. Returns at once; the file is finalised by /stop."""
     from .recorder import start
-    from .paths import RENDERS
 
     geo = body.get("geometry")
     if not geo and body.get("window"):
