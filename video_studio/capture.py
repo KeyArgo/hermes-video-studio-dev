@@ -85,3 +85,36 @@ def studio_walkthrough(url: str, out: Path) -> dict:
         {"wait": 900},
     ]
     return record(url, steps, out)
+
+
+def desktop(out: Path, seconds: float = 10.0, region: str | None = None,
+            fps: int = 30) -> dict:
+    """Record the desktop itself — for anything that is not a web page.
+
+    On Wayland this needs `wf-recorder` (it speaks the compositor's screencopy protocol directly,
+    so no portal and no root are involved once installed). It is not installed on this host, and
+    `sudo` needs a password here, so this function fails with the exact command instead of
+    pretending it can capture. OBS is the manual fallback: record, then pass the file through
+    `POST /films/{id}/beats/{bid}/footage`.
+    """
+    import shutil
+
+    rec = shutil.which("wf-recorder")
+    if not rec:
+        return {"ok": False, "error": "wf-recorder not installed",
+                "install": "sudo zypper install wf-recorder",
+                "alternative": "record with OBS, then use POST /films/{id}/beats/{bid}/footage"}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [rec, "-f", str(out), "--codec", "libx264", "--framerate", str(fps)]
+    if region:
+        cmd += ["--geometry", region]
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    try:
+        proc.wait(timeout=seconds)
+    except subprocess.TimeoutExpired:
+        proc.send_signal(2)  # SIGINT: wf-recorder finalises the file on this
+        proc.wait(timeout=20)
+    if not out.is_file():
+        return {"ok": False, "error": "capture produced no file",
+                "stderr": (proc.stderr.read() if proc.stderr else "")[-300:]}
+    return {"ok": True, "output": str(out), "seconds": _seconds(out), "fps": fps}
