@@ -25,6 +25,11 @@ STUDIO = ROOT / "studio"
 app = FastAPI(title="Video Studio", docs_url=None, redoc_url=None)
 app.include_router(films_router, prefix="/api")
 
+from video_studio.assets_api import router as assets_router  # noqa: E402
+from video_studio.comfy_api import router as comfy_router  # noqa: E402
+app.include_router(assets_router, prefix="/api")
+app.include_router(comfy_router, prefix="/api")
+
 
 @app.get("/api/status")
 def status():
@@ -32,26 +37,9 @@ def status():
     return {"ok": True, "plugin": "hewn-video-studio", "workspace": str(MOTION)}
 
 
-@app.get("/", response_class=HTMLResponse)
-def index():
-    page = STUDIO / "index.html"
-    if not page.is_file():
-        return HTMLResponse("<h1>Video Studio</h1><p>studio/index.html is missing.</p>", status_code=500)
-    return HTMLResponse(page.read_text(encoding="utf-8"))
-
-
-@app.get("/app.js")
-def app_js():
-    return FileResponse(str(STUDIO / "app.js"), media_type="application/javascript")
-
-
-@app.get("/styles.css")
-def styles():
-    return FileResponse(str(STUDIO / "styles.css"), media_type="text/css")
-
-
-if (STUDIO / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=str(STUDIO / "assets")), name="assets")
+# Everything else under studio/ is served as-is. A mount (not one route per file) means a new
+# panel or script works the moment it is written, instead of 404ing until the host is edited.
+app.mount("/", StaticFiles(directory=str(STUDIO), html=True), name="studio")
 
 
 def main() -> None:

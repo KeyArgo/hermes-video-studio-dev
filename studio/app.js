@@ -68,7 +68,8 @@
         onclick: function () { openFilm(f.id) }
       }, [
         el('b', { text: f.title }),
-        el('span', { text: fmt(f.total) + ' · ' + f.beats + ' shots · ' + f.renders.length + ' renders' })
+        el('span', { text: fmt(f.total) + ' · ' + f.beats + ' shot' + (f.beats === 1 ? '' : 's') + ' · '
+          + f.renders.length + ' render' + (f.renders.length === 1 ? '' : 's') })
       ]))
     })
   }

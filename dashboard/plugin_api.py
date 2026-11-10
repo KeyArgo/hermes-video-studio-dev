@@ -23,6 +23,14 @@ router = APIRouter()
 import films as _films  # noqa: E402
 router.include_router(_films.router)
 
+# Assets: screenshots, screen recordings and other source material (proxy + thumbnail + sidecar).
+from video_studio.assets_api import router as _assets_router  # noqa: E402
+router.include_router(_assets_router)
+
+# Generation: ComfyUI (MiniMax H3, Wan, music) as a renderer for beats.
+from video_studio.comfy_api import router as _comfy_router  # noqa: E402
+router.include_router(_comfy_router)
+
 MAX_JSON_BODY_BYTES = 256 * 1024
 
 

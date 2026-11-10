@@ -10,6 +10,11 @@
 <div id="app">
   <aside id="rail">
     <div class="brand"><span class="brand-mark">▣</span> <b>Hewn</b> <span class="brand-dim">Video Studio</span></div>
+    <nav class="rooms" id="rooms">
+      <button class="room on" data-room="films">Films</button>
+      <button class="room" data-room="assets">Assets</button>
+      <button class="room" data-room="generate">Generate</button>
+    </nav>
     <div class="rail-label">Films</div>
     <div id="films" class="films"></div>
     <div class="rail-foot" id="rail-foot"></div>
@@ -27,6 +32,7 @@
       </div>
     </header>
 
+    <div id="room-films">
     <div id="player-wrap">
       <video id="player" controls playsinline></video>
       <div id="player-empty" class="empty">No render yet. Edit a shot, then render the film.</div>
@@ -34,6 +40,33 @@
 
     <div id="timeline">
       <div id="beats" class="beats"></div>
+    </div>
+    </div>
+
+    <div id="room-assets" class="room-view" hidden>
+      <div class="room-head">
+        <div>
+          <h2>Assets</h2>
+          <div class="sub" id="assets-sub">Screenshots, screen recordings and anything else you drop in.</div>
+        </div>
+        <div class="actions">
+          <input id="file-input" type="file" multiple accept="image/*,video/*,audio/*" hidden>
+          <button id="btn-add" class="btn btn-primary">Add files</button>
+          <button id="btn-scan" class="btn">Scan intake folder</button>
+        </div>
+      </div>
+      <div id="asset-grid" class="asset-grid"><p class="hint">No assets yet.</p></div>
+    </div>
+
+    <div id="room-generate" class="room-view" hidden>
+      <div class="room-head">
+        <div>
+          <h2>Generate</h2>
+          <div class="sub" id="gen-sub">The GPUs that make video: MiniMax H3, Wan, music.</div>
+        </div>
+        <div class="actions"><button id="btn-gen-refresh" class="btn">Check GPUs</button></div>
+      </div>
+      <div id="gen-body" class="gen-body"><p class="hint">Press Check GPUs to ask the box what it can do.</p></div>
     </div>
 
     <div id="status-bar"><span id="status-text">Ready</span></div>
@@ -57,5 +90,6 @@
   </aside>
 </div>
 <script src="/app.js"></script>
+<script src="/rooms.js"></script>
 </body>
 </html>
