@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from .script import Treatment, ScriptError, draft, parse, save
+from . import shotgen
 
 router = APIRouter()
 
@@ -60,3 +61,36 @@ def post_save(body: dict):
         return save(treatment, _workspace(), body.get("id"))
     except ScriptError as exc:
         raise HTTPException(422, str(exc)) from None
+
+
+@router.post("/script/{film_id}/shots")
+def post_shots(film_id: str, body: dict | None = None):
+    """Author the HyperFrames composition for every beat that has none yet.
+
+    Slow (a model call per beat). A beat that fails the contract is reported, not rendered.
+    """
+    import json
+    body = body or {}
+    workspace = _workspace()
+    film_path = workspace / "films" / f"{film_id}.json"
+    if not film_path.is_file():
+        raise HTTPException(404, f"no film {film_id}")
+    film = json.loads(film_path.read_text())
+    beats = film.get("beats") or []
+    if not beats:
+        raise HTTPException(422, "the film has no beats")
+    result = shotgen.write_all(beats, workspace / "film" / "compositions",
+                               accent=str(film.get("accent") or "#3b82f6"),
+                               only_missing=bool(body.get("only_missing", True)))
+    return result
+
+
+@router.post("/script/{film_id}/build")
+def post_build(film_id: str, body: dict | None = None):
+    """Author missing shots, then hand the film to the renderer. Returns the render job."""
+    from .films_api import render_film
+    shots = post_shots(film_id, body)
+    if not shots["written"] and not shots["skipped"]:
+        raise HTTPException(422, "no compositions to render")
+    job = render_film(film_id)
+    return {"shots": shots, **job}

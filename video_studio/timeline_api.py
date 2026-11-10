@@ -46,6 +46,36 @@ def post_undo(film_id: str):
     return timeline_ops.save(workspace, state)
 
 
+@router.post("/timeline/{film_id}/from-film")
+def post_from_film(film_id: str):
+    """Seed the timeline from a film's storyboard: one clip per beat that has a shot render.
+
+    This is the join between the two rooms — the storyboard defines the order, the timeline
+    owns the cut. A beat without a render is skipped and reported, never filled with a guess.
+    """
+    import json
+    workspace = _workspace()
+    film_path = workspace / "films" / f"{film_id}.json"
+    if not film_path.is_file():
+        raise HTTPException(404, f"no film {film_id}")
+    film = json.loads(film_path.read_text())
+    state = timeline_ops.empty(film_id)
+    at, placed, missing = 0.0, [], []
+    for beat in film.get("beats") or []:
+        dur = float(beat.get("duration") or 0)
+        shot = workspace / "renders" / "shots" / f"{beat['id']}.mp4"
+        if shot.is_file() and dur > 0:
+            state = timeline_ops.place(state, asset=str(shot), track="V1", start=at,
+                                       duration=dur, clip_id=beat["id"])
+            placed.append(beat["id"])
+            at += dur
+        else:
+            missing.append(beat["id"])
+            at += dur
+    state = timeline_ops.save(workspace, state)
+    return {"state": state, "placed": placed, "missing": missing, "total": state["total"]}
+
+
 @router.post("/timeline/{film_id}/reset")
 def post_reset(film_id: str):
     workspace = _workspace()

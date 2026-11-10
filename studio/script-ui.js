@@ -2,7 +2,7 @@
 (function () {
   'use strict'
   var API = '/api'
-  var state = { treatment: null, busy: false }
+  var state = { treatment: null, filmId: null, busy: false }
 
   function $(id) { return document.getElementById(id) }
   function el(tag, attrs, kids) {
@@ -111,11 +111,40 @@
       seconds: Number(t.total)
     }) }).then(function (r) {
       note('Saved ' + r.id + ' · ' + r.beats.length + ' beats · ' + r.total + 's')
+      state.filmId = r.id
+      var b = $('btn-build-script'); if (b) b.disabled = false
       if (window.__studioReloadFilms) window.__studioReloadFilms()
     }).catch(function (e) { note('Save refused: ' + e.message) })
   }
 
+  function build() {
+    if (!state.filmId) { note('Save the film first.'); return }
+    note('Authoring shots with the lane, then rendering… this takes minutes, not seconds.')
+    $('btn-build-script').disabled = true
+    api('/script/' + state.filmId + '/build', { method: 'POST', body: JSON.stringify({ only_missing: true }) })
+      .then(function (r) {
+        var w = r.shots.written.length, f = r.shots.failed.length
+        note('wrote ' + w + ' shots' + (f ? ', ' + f + ' refused' : '') + ' · rendering ' + r.job)
+        if (r.shots.failed.length) {
+          r.shots.failed.forEach(function (x) { note('refused ' + x.id + ': ' + x.error) })
+        }
+        pollBuild(r.job)
+      })
+      .catch(function (e) { note('Build refused: ' + e.message); $('btn-build-script').disabled = false })
+  }
+
+  function pollBuild(jid) {
+    api('/jobs/' + jid).then(function (j) {
+      if (j.state === 'running') { note('Rendering… ' + Math.round((j.seconds || 0)) + 's'); setTimeout(function () { pollBuild(jid) }, 4000); return }
+      note(j.state === 'done' ? 'Rendered in ' + Math.round(j.seconds) + 's — open Films to watch it'
+                              : 'Render failed: ' + String(j.tail || '').slice(-200))
+      $('btn-build-script').disabled = false
+      if (window.__studioReloadFilms) window.__studioReloadFilms()
+    }).catch(function (e) { note('Job lost: ' + e.message); $('btn-build-script').disabled = false })
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
+    var b = $('btn-build-script'); if (b) b.addEventListener('click', build)
     var d = $('btn-draft'); if (d) d.addEventListener('click', draft)
     var s = $('btn-save-script'); if (s) s.addEventListener('click', save)
     render()

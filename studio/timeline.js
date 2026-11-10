@@ -4,6 +4,7 @@
   'use strict'
   var API = '/api'
   var FILM = 'demo'
+  function filmId() { return window.__studioFilm || FILM }
   var PPS = 64                    // pixels per second, fixed for now
   var TRACKS = ['V1', 'V2', 'A1', 'A2']
   var state = { timeline: null, assets: [], selected: null, busy: false }
@@ -40,7 +41,7 @@
   function note(msg) { var s = $('tl-status'); if (s) s.textContent = msg }
 
   function load() {
-    api('/timeline/' + FILM).then(function (t) { state.timeline = t; draw() })
+    api('/timeline/' + filmId()).then(function (t) { state.timeline = t; draw() })
       .catch(function (e) { note('Cannot read timeline: ' + e.message) })
   }
 
@@ -136,13 +137,23 @@
   function round(v) { return Math.round(v * 100) / 100 }
 
   function send(ops) {
-    api('/timeline/' + FILM + '/ops', { method: 'POST', body: JSON.stringify({ ops: ops }) })
+    api('/timeline/' + filmId() + '/ops', { method: 'POST', body: JSON.stringify({ ops: ops }) })
       .then(function (t) { state.timeline = t; draw() })
       .catch(function (e) { note('Refused: ' + e.message); load() })
   }
 
+  function fromFilm() {
+    note('Seeding the timeline from ' + filmId() + '…')
+    api('/timeline/' + filmId() + '/from-film', { method: 'POST' }).then(function (r) {
+      state.timeline = r.state
+      draw()
+      note('placed ' + r.placed.length + ' · missing ' + r.missing.length +
+        (r.missing.length ? ' (' + r.missing.join(', ') + ')' : ''))
+    }).catch(function (e) { note('Cannot seed: ' + e.message) })
+  }
+
   function undo() {
-    api('/timeline/' + FILM + '/undo', { method: 'POST' })
+    api('/timeline/' + filmId() + '/undo', { method: 'POST' })
       .then(function (t) { state.timeline = t; draw(); note('undone') })
       .catch(function (e) { note('Nothing to undo: ' + e.message) })
   }
@@ -178,7 +189,7 @@
   function renderTimeline() {
     note('Rendering through MLT… this waits, it does not poll')
     $('btn-tl-render').disabled = true
-    api('/timeline/' + FILM + '/render', { method: 'POST', body: JSON.stringify({ quality: 'draft' }) })
+    api('/timeline/' + filmId() + '/render', { method: 'POST', body: JSON.stringify({ quality: 'draft' }) })
       .then(function (r) { note('Rendered ' + r.seconds.toFixed(2) + 's · ' + Math.round(r.bytes / 1048576 * 10) / 10 + ' MB') })
       .catch(function (e) { note('Render failed: ' + e.message) })
       .then(function () { $('btn-tl-render').disabled = false })
@@ -189,5 +200,6 @@
     var a = $('btn-tl-add'); if (a) a.addEventListener('click', addClip)
     var u = $('btn-tl-undo'); if (u) u.addEventListener('click', undo)
     var r = $('btn-tl-render'); if (r) r.addEventListener('click', renderTimeline)
+    var f = $('btn-tl-from-film'); if (f) f.addEventListener('click', fromFilm)
   })
 })()

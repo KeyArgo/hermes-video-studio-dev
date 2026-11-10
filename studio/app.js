@@ -75,6 +75,7 @@
   }
 
   function openFilm(id) {
+    window.__studioFilm = id
     state.id = id
     state.gate = null
     state.shot = null
