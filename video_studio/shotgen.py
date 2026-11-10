@@ -33,6 +33,9 @@ Hard requirements:
   sets `window.__timelines = window.__timelines || {{}}; window.__timelines["{shot_id}"] = tl;`
 - gsap is already loaded globally; do NOT import anything, no network, no external fonts, no images.
 - Frame 0 must be fully legible and opaque: the headline visible, background painted, >= 80% opacity.
+- EVERY tween must carry an explicit time position as its last argument (`, 0` for "start at
+  zero"). A tween without a position is appended after the previous one, which silently shifts
+  all motion past the end of the shot — this produced static seconds in practice.
 - Motion must continue for the WHOLE {seconds}s: a slow persistent background move (a blurred
   orb, a grid drift, a gradient sweep) plus one entrance. Never leave a static stretch.
 - Type: sizes >= 34px. No text may overflow its container. Max 12 words of headline.
