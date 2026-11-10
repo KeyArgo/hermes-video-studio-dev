@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 H3_FPS = 24
@@ -101,7 +102,12 @@ def render_beat(comfy, graph: dict, beat: dict, dest: Path, workdir: Path,
         "15": {"filename_prefix": f"h3_{beat.get('id', 'beat')}"},
     }
     raw = Path(workdir) / f"h3-{beat.get('id', 'beat')}-raw.mp4"
+    started = time.perf_counter()
     result = comfy.render(graph, params, raw, timeout=timeout)
+    # the client does not report how long the GPU took, and a cost nobody measured is a guess:
+    # time it here so the UI and the handover both quote a real number
+    if not result.get("seconds_spent"):
+        result["seconds_spent"] = round(time.perf_counter() - started, 1)
     norm = normalise(raw, dest, seconds)
     try:
         raw.unlink()
