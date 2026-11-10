@@ -44,7 +44,7 @@
 
   // ------------------------------------------------------------------- rooms
   function show(room) {
-    ;['films', 'assets', 'generate'].forEach(function (r) {
+    ;['films', 'assets', 'generate', 'music'].forEach(function (r) {
       var view = $('room-' + r)
       if (view) view.hidden = r !== room
     })
@@ -53,6 +53,7 @@
     })
     if (room === 'assets') loadAssets()
     if (room === 'generate') loadComfy()
+    if (room === 'music') loadMusic()
     if (room === 'timeline' && window.__studioLoadTimeline) window.__studioLoadTimeline()
   }
 
@@ -238,6 +239,72 @@
       .then(function () { btn.disabled = false })
   }
 
+  // ------------------------------------------------------------------- music
+  //
+  // Tracks are read from Music Studio's own store; the film keeps only a pointer
+  // (track id, where to start, fades). Making music stays in the music room.
+  function loadMusic() {
+    var list = $('music-list')
+    var fid = window.__studioFilm
+    if (!list) return
+    list.innerHTML = ''
+    list.appendChild(el('p', { class: 'hint', text: 'Reading Music Studio…' }))
+    api('/music/library').then(function (lib) {
+      list.innerHTML = ''
+      if (!lib.tracks || !lib.tracks.length) {
+        list.appendChild(el('div', { class: 'music-promo' }, [
+          el('b', { text: 'No takes yet' }),
+          el('span', { class: 'mono-dim', text: ' Music Studio has no rendered takes in ' + lib.store + '. Make one there first.' })
+        ]))
+        return
+      }
+      var current = null
+      var render = function () {
+        if (!fid) { list.appendChild(el('p', { class: 'hint', text: 'Pick a film in the rail, then choose a bed.' })); return }
+        api('/films/' + encodeURIComponent(fid)).then(function (film) {
+          current = film.music || null
+          $('music-current').textContent = current
+            ? 'bed: ' + current.title + ' · from ' + current.start + 's · fade ' + current.fade_in + 's / ' + current.fade_out + 's'
+            : 'bed: none — the cut will use whatever renders/bed-*.wav exists, or be silent'
+          lib.tracks.forEach(function (t) {
+            var btn = el('button', { class: 'btn small', text: current && current.track_id === t.id ? 'In use' : 'Use as bed' })
+            btn.disabled = !!(current && current.track_id === t.id)
+            btn.addEventListener('click', function () {
+              btn.disabled = true
+              api('/films/' + encodeURIComponent(fid) + '/music', { method: 'POST',
+                body: JSON.stringify({ track_id: t.id, start: 0, fade_in: 1.0, fade_out: 1.5 }) })
+                .then(function () { status('Bed set to “' + t.title + '”'); loadMusic() })
+                .catch(function (e) { status('Could not set bed: ' + e.message); btn.disabled = false })
+            })
+            list.appendChild(el('div', { class: 'music-row' }, [
+              el('div', { class: 'music-title' }, [el('b', { text: t.title }), el('span', { class: 'mono-dim', text: ' · ' + t.seconds + 's' })]),
+              el('div', { class: 'music-meta mono-dim', text: [t.bpm ? t.bpm + ' bpm' : '', t.key || ''].filter(Boolean).join(' · ') }),
+              el('div', { class: 'music-actions' }, [btn])
+            ]))
+          })
+        }).catch(function (e) { $('music-current').textContent = 'film unreadable: ' + e.message })
+      }
+      render()
+    }).catch(function (e) {
+      list.innerHTML = ''
+      list.appendChild(el('p', { class: 'hint', text: 'Library failed: ' + e.message }))
+    })
+  }
+
+  function openMusicStudio() {
+    api('/neighbour/music-studio')
+      .then(function (r) { window.open(r.url, '_blank') })
+      .catch(function (e) { status('Music Studio unreachable: ' + e.message) })
+  }
+
+  function clearMusic() {
+    var fid = window.__studioFilm
+    if (!fid) { status('Pick a film first'); return }
+    api('/films/' + encodeURIComponent(fid) + '/music', { method: 'POST', body: JSON.stringify({ track_id: 'none' }) })
+      .then(function () { status('Bed removed'); loadMusic() })
+      .catch(function (e) { status('Could not clear: ' + e.message) })
+  }
+
   function upload(files) {
     if (!files || !files.length) return
     var list = Array.prototype.slice.call(files)
@@ -275,6 +342,9 @@
     var s = $('btn-scan'); if (s) s.addEventListener('click', scan)
     var g = $('btn-gen-refresh'); if (g) g.addEventListener('click', loadComfy)
     var asm = $('btn-gen-assemble'); if (asm) asm.addEventListener('click', assemble)
+    var mr = $('btn-music-refresh'); if (mr) mr.addEventListener('click', loadMusic)
+    var mc = $('btn-music-clear'); if (mc) mc.addEventListener('click', clearMusic)
+    var om = $('btn-open-music'); if (om) om.addEventListener('click', openMusicStudio)
     var pick = $('file-input'); if (pick) pick.addEventListener('change', function () { upload(pick.files); pick.value = '' })
     var add = $('btn-add'); if (add) add.addEventListener('click', function () { if (pick) pick.click() })
     var grid = $('asset-grid')

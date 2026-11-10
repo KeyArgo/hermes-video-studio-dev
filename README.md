@@ -109,3 +109,23 @@ python3 -m hewn_cut.cli undo    demo/project.json
   cards; proposing them as cuts would delete the cards.
 - **`atempo` is chained** for speeds outside 0.5–2.0, so 4× works.
 - **Render is a full re-encode** (~2 min for 90 s at crf 18). No proxies.
+
+
+## Works with Music Studio
+
+Video Studio does not synthesise music and does not pretend to. Beds come from
+[Music Studio](https://github.com/KeyArgo/hermes-music-studio): the **Music** room reads that
+plugin's take store (`~/.hermes/plugin-data/hermes-music-studio`), lists every rendered take with
+its tempo and key, and attaches one to a film by pointer — track id, start offset, fades. Nothing
+is copied and that store is never written to.
+
+Music Studio links back the other way: its studio has a **Cut a video →** button that finds this
+plugin's running host and opens it. Both sides discover each other's port from the other's
+`studio-host.json`, so moving either one does not break the link.
+
+## Drafts before commitment
+
+`POST /films/{id}/drafts` renders three whole directions of a film — *quiet*, *cinematic*
+(letterbox + vignette), *kinetic* (amber, harder edges) — at half frame rate and quarter size,
+with the film's music already under them. A 24 s film becomes three ~1 MB files in a few minutes,
+so the choice of direction is made by watching, not by imagining.

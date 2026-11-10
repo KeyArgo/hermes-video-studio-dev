@@ -347,3 +347,15 @@ html, body {
 
 /* a room is a room: `hidden` must beat `display: flex` on .room-view */
 [hidden] { display: none !important; }
+
+/* music room */
+.music-list { display: grid; gap: 8px; padding: 4px 22px 18px; }
+.music-row { display: grid; grid-template-columns: 1fr auto auto; gap: 16px; align-items: center;
+  padding: 11px 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.music-title { font-size: 13px; }
+.music-meta { font-size: 10.5px; }
+.music-actions { justify-self: end; }
+.music-current { padding: 0 22px 10px; font-size: 11px; }
+.music-promo { margin: 6px 22px 18px; padding: 12px 14px; border: 1px dashed var(--line);
+  border-radius: 8px; font-size: 11.5px; display: grid; gap: 4px; }
+.music-promo b { color: var(--ink); font-weight: 600; }

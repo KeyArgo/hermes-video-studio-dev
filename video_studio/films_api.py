@@ -74,6 +74,14 @@ def _load(fid: str) -> dict:
     return json.loads(_film_path(fid).read_text())
 
 
+def _save(fid: str, data: dict) -> None:
+    """Write a film back. Atomic, so a crash cannot leave a half-written film behind."""
+    path = _film_path(fid)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    tmp.replace(path)
+
+
 def _shot(beat: dict) -> Path:
     src = beat.get("src") or f"compositions/{beat['id']}.html"
     p = (FILM_DIR / src).resolve()
@@ -287,6 +295,93 @@ def gate(fid: str):
     return {"video": video.name, **json.loads(r.stdout.strip().splitlines()[-1])}
 
 
+@router.post("/films/{fid}/drafts")
+def make_drafts(fid: str, body: dict | None = None):
+    """Render several cheap directions of the same film and cut each one, music included.
+
+    Returns a job id: three drafts of a 24 s film take a few minutes, and blocking an HTTP call
+    that long is how UIs look broken.
+    """
+    from . import drafts as draft_mod
+
+    body = body or {}
+    names = [n for n in (body.get("variants") or []) if n] or list(draft_mod.DEFAULT)
+    unknown = [n for n in names if n not in draft_mod.VARIANTS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"unknown variant(s): {', '.join(unknown)}")
+    data = _load(fid)
+    total = float(data.get("total") or
+                  sum(float(b.get("duration") or 0) for b in data.get("beats") or []))
+
+    jid = uuid.uuid4().hex[:12]
+    with _lock:
+        _jobs[jid] = {"id": jid, "film": fid, "kind": "drafts", "state": "running",
+                      "started": time.time(), "variants": names, "tail": ""}
+
+    def work():
+        from .music import bed_from_track, find
+
+        root = RENDERS / "drafts"
+        bed = None
+        if data.get("music"):
+            track = find(str(data["music"].get("track_id")))
+            if track:
+                bed = RENDERS / f"bed-{fid}.wav"
+                if not bed.is_file():
+                    bed_from_track(track, bed, total,
+                                   start=float(data["music"].get("start", 0.0)),
+                                   fade_in=float(data["music"].get("fade_in", 0.6)),
+                                   fade_out=float(data["music"].get("fade_out", 1.0)))
+        written = []
+        for name in names:
+            vdir = root / f"{fid}-{name}"
+            project = draft_mod.build(fid, name, data, FILM_DIR,
+                                      FILM_DIR / "drafts" / f"{fid}-{name}")
+            raw = vdir / "raw.mp4"
+            draft_mod.render_variant(project, raw)
+            out = root / f"{fid}-draft-{name}.mp4"
+            draft_mod.assemble([raw], out, bed=bed)
+            draft_mod.note(fid, name, [out], vdir)
+            written.append({"variant": name, "label": draft_mod.VARIANTS[name]["label"],
+                            "output": out.name, "bytes": out.stat().st_size})
+        return written
+
+    def runner():
+        try:
+            result = work()
+            with _lock:
+                _jobs[jid].update({"state": "done", "ok": True, "result": result,
+                                   "seconds": round(time.time() - _jobs[jid]["started"], 1)})
+        except Exception as exc:  # noqa: BLE001
+            with _lock:
+                _jobs[jid].update({"state": "failed", "ok": False, "tail": str(exc)})
+
+    threading.Thread(target=runner, daemon=True).start()
+    return {"job": jid, "variants": names, "seconds": total}
+
+
+@router.get("/films/{fid}/drafts")
+def list_drafts(fid: str):
+    _film_path(fid)
+    root = RENDERS / "drafts"
+    if not root.is_dir():
+        return {"film": fid, "drafts": []}
+    out = []
+    for p in sorted(root.glob(f"{fid}-draft-*.mp4"), key=lambda x: x.stat().st_mtime, reverse=True):
+        out.append({"name": p.name, "variant": p.stem.rsplit("-", 1)[-1],
+                    "bytes": p.stat().st_size, "mtime": int(p.stat().st_mtime)})
+    return {"film": fid, "drafts": out}
+
+
+@router.get("/films/{fid}/drafts/{variant}/video")
+def draft_video(fid: str, variant: str):
+    _film_path(fid)
+    p = RENDERS / "drafts" / f"{fid}-draft-{_clean(variant, 'variant')}.mp4"
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail=f"no draft {variant} for {fid}")
+    return FileResponse(str(p), media_type="video/mp4")
+
+
 @router.get("/films/{fid}/video")
 def video(fid: str):
     _film_path(fid)
@@ -322,6 +417,65 @@ def studio_host():
         raise HTTPException(status_code=503, detail=f"studio host unavailable: {exc}") from None
 
 
+@router.get("/neighbour/music-studio")
+def music_studio_url():
+    """Where Music Studio is running, so the studio can hand the user over to it.
+
+    Discovered from that plugin's own state file rather than hard-coded: both plugins can be
+    moved, and a link to a dead port is worse than no link.
+    """
+    import urllib.request
+
+    state = Path.home() / ".hermes" / "plugin-data" / "hermes-music-studio" / "studio-host.json"
+    if not state.is_file():
+        raise HTTPException(status_code=503, detail="Music Studio has not been started yet")
+    try:
+        port = int(json.loads(state.read_text()).get("port"))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        raise HTTPException(status_code=503, detail="Music Studio's state file is unreadable") from None
+    url = f"http://127.0.0.1:{port}"
+    try:
+        urllib.request.urlopen(url, timeout=3)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Music Studio is not answering on {port}") from None
+    return {"url": url, "plugin": "hermes-music-studio"}
+
+
+@router.get("/music/library")
+def music_library():
+    """Tracks Music Studio has rendered. Read-only: this never touches that plugin's store."""
+    from .music import library, store
+    try:
+        tracks = library()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"music store unreadable: {exc}") from None
+    return {"store": str(store()), "tracks": tracks}
+
+
+@router.post("/films/{fid}/music")
+def attach_music(fid: str, body: dict):
+    """Choose the film's bed from the music library — or clear it."""
+    from .music import find
+
+    data = _load(fid)
+    if body.get("track_id") in (None, "", "none"):
+        data.pop("music", None)
+        _save(fid, data)
+        return {"film": fid, "music": None}
+    track = find(str(body["track_id"]))
+    if track is None:
+        raise HTTPException(status_code=404, detail=f"no track {body['track_id']} in the music library")
+    data["music"] = {
+        "track_id": track["id"],
+        "title": track["title"],
+        "start": float(body.get("start", 0.0)),
+        "fade_in": float(body.get("fade_in", 0.6)),
+        "fade_out": float(body.get("fade_out", 1.0)),
+    }
+    _save(fid, data)
+    return {"film": fid, "music": data["music"], "track": track}
+
+
 @router.post("/films/{fid}/assemble")
 def assemble_film(fid: str, body: dict | None = None):
     """Cut the film from its beat clips with MLT, whoever rendered them.
@@ -340,10 +494,23 @@ def assemble_film(fid: str, body: dict | None = None):
         raise HTTPException(400, f"not rendered yet: {', '.join(missing)}")
 
     bed = None
-    for cand in (RENDERS / f"bed-{int(round(total))}.wav", RENDERS / "bed.wav"):
-        if cand.is_file():
-            bed = cand
-            break
+    music_note = None
+    if data.get("music"):
+        from .music import bed_from_track, find
+
+        track = find(str(data["music"].get("track_id")))
+        if track is None:
+            raise HTTPException(400, detail=f"music track {data['music'].get('track_id')} is gone from the library")
+        bed = RENDERS / f"bed-{fid}.wav"
+        music_note = bed_from_track(track, bed, total,
+                                    start=float(data["music"].get("start", 0.0)),
+                                    fade_in=float(data["music"].get("fade_in", 0.6)),
+                                    fade_out=float(data["music"].get("fade_out", 1.0)))
+    if bed is None:
+        for cand in (RENDERS / f"bed-{int(round(total))}.wav", RENDERS / "bed.wav"):
+            if cand.is_file():
+                bed = cand
+                break
 
     project = from_beats(beats, SHOTS_OUT, bed=bed, total=total,
                          title=fid, dissolve=float(body.get("dissolve", 0.0)))
@@ -351,4 +518,5 @@ def assemble_film(fid: str, body: dict | None = None):
     res = mlt_render(project, out)
     audio = normalise_audio(out) if bed else {"audio": "no bed"}
     return {"film": fid, "output": out.name, "seconds": total,
-            "clips": len(project.video()), "bed": bed.name if bed else None, **res, **audio}
+            "clips": len(project.video()), "bed": bed.name if bed else None,
+            "music": music_note, **res, **audio}

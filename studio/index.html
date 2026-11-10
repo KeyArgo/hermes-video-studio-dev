@@ -16,6 +16,7 @@
       <button class="room" data-room="script">Script</button>
       <button class="room" data-room="timeline">Timeline</button>
       <button class="room" data-room="generate">Generate</button>
+      <button class="room" data-room="music">Music</button>
     </nav>
     <div class="rail-label">Films</div>
     <div id="films" class="films"></div>
@@ -116,6 +117,27 @@
           <button id="btn-gen-assemble" class="btn">Assemble cut</button>
         </div>
         <div id="gen-beat-list" class="gen-beat-list"><p class="hint">Select a film to see its beats.</p></div>
+      </div>
+    </div>
+
+    <div id="room-music" class="room-view" hidden>
+      <div class="room-head">
+        <div>
+          <h2>Music</h2>
+          <div class="sub" id="music-sub">Beds for this film, taken from Music Studio.</div>
+        </div>
+        <div class="actions">
+          <button id="btn-music-refresh" class="btn">Read library</button>
+          <button id="btn-music-clear" class="btn">Remove bed</button>
+        </div>
+      </div>
+      <div id="music-current" class="music-current mono-dim"></div>
+      <div id="music-list" class="music-list"></div>
+      <div class="music-promo">
+        <b>Tracks come from Music Studio</b>
+        <span class="mono-dim">Make or re-take music there, then press Read library — nothing is copied, the film
+        points at the take. Video Studio never writes to that store.</span>
+        <button id="btn-open-music" class="btn small">Open Music Studio →</button>
       </div>
     </div>
 
