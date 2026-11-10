@@ -176,7 +176,7 @@ def transform_captions(caps, kind, rng=None, factor=None):
             elif s < a and e > b:
                 r1 = keep(s, a, t)
                 if r1: out.append(r1)
-                r2 = keep(b + shift - d, e - shift, t)
+                r2 = keep(b - shift, e - shift, t)
                 if r2: out.append(r2)
             elif s < a and e <= b:
                 r1 = keep(s, a, t)
@@ -190,7 +190,7 @@ def transform_captions(caps, kind, rng=None, factor=None):
                 ne = a + (b - a) / f
                 r1 = keep(ns, ne, t)
                 if r1: out.append(r1)
-                r2 = keep(b + shift - d, e - shift, t)
+                r2 = keep(b - shift, e - shift, t)
                 if r2: out.append(r2)
         return out
 
