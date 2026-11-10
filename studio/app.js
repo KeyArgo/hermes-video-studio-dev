@@ -259,13 +259,14 @@
     if (!chip) return
     api('/version').then(function (data) {
       var build = (data && data.build) || {}
-      var parts = ['v' + (build.version || 'unknown')]
+      // a missing build stamp is a state, not a version called "vunknown"
+      var parts = [build.version ? 'v' + build.version : 'build unknown']
       if (build.commit_date) parts.push(String(build.commit_date).slice(0, 10))
       if (build.commit_short || build.commit) parts.push((build.commit_short || build.commit).slice(0, 8))
       chip.textContent = parts.join(' · ') + (build.dirty ? ' · modified' : '')
       chip.classList.toggle('dirty', !!build.dirty)
       chip.title = [
-        'Video Studio ' + (build.version || 'unknown'),
+        'Video Studio ' + (build.version || 'build unknown'),
         build.commit ? 'commit ' + build.commit : 'no commit (installed copy)',
         build.commit_date ? 'committed ' + build.commit_date : '',
         build.built_at ? 'installed ' + build.built_at : '',
