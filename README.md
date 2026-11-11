@@ -60,7 +60,7 @@ so replay never touches ffmpeg.
 ## Install
 
 ```bash
-hermes plugins install KeyArgo/hermes-video-studio-dev   # private repo: run `gh auth login` first
+hermes plugins install KeyArgo/hermes-video-studio-dev   # public repo, no account needed
 # or locally: cp -r . ~/.hermes/plugins/hewn-video-studio
 hermes plugins validate hewn-video-studio
 hermes plugins enable hewn-video-studio          # tools and the tab load on the next session
