@@ -204,9 +204,15 @@ def render(project: Project, out: Path, workdir: Path | None = None,
                 "vcodec=libx264", "preset=medium", "crf=18" if quality == "delivery" else "crf=23",
                 "acodec=aac", "ab=192k", "ar=48000", "f=mp4",
                 "rescale=bicubic", "real_time=-4"]
-    proc = subprocess.run(["melt", str(xml_path), *consumer], capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError("melt failed:\n" + (proc.stderr or proc.stdout)[-1500:])
+    # Through the job registry: melt is the longest single step of an export, so it must be
+    # visible in /api/jobs, cancellable, low priority, and reaped when the host goes away.
+    from . import jobs
+    job = jobs.start("assemble", ["melt", str(xml_path), *consumer], film=out.stem, label="assemble")
+    _out, _err = job["proc"].communicate()
+    rc = job["proc"].returncode
+    jobs.finish(job["id"], "done" if rc == 0 else "failed", (_err or "")[-300:])
+    if rc != 0:
+        raise RuntimeError("melt failed:\n" + ((_err or "") + (_out or ""))[-1500:])
     return {"out": str(out), "xml": str(xml_path), "seconds": _duration(out),
             "bytes": out.stat().st_size}
 
@@ -222,7 +228,9 @@ def _measure_loudness(path: Path) -> dict:
     if not m:
         return {}
     d = _json.loads(m.group(0))
-    return {"lufs": float(d["input_i"]), "tp": float(d["input_tp"])}
+    return {"lufs": float(d["input_i"]), "tp": float(d["input_tp"]),
+            "lra": float(d.get("input_lra", 0.0) or 0.0),
+            "thresh": float(d.get("input_thresh", -70.0) or -70.0)}
 
 
 def normalise_audio(path: Path, low: float = -18.0, high: float = -14.0,
@@ -236,12 +244,21 @@ def normalise_audio(path: Path, low: float = -18.0, high: float = -14.0,
     before = _measure_loudness(path)
     if not before:
         return {"audio": "none"}
-    if low <= before["lufs"] <= high:
+    # Inside the loudness band is not the whole check: a cut can average -16.9 LUFS and still
+    # peak at -0.8 dBTP, which the gate fails and a listener hears as clipping. Peaks are fixed
+    # here too, or the "already in band" shortcut ships a broken mix.
+    peak = before.get("tp", -99.0)
+    if low <= before["lufs"] <= high and peak <= -1.2:
         return {"audio": "already in band", **before}
     tmp = path.with_suffix(".norm.mp4")
+    # Two-pass loudnorm. Single-pass mode rides the gain while it measures, which overshot by
+    # 3 dB on a 60 s cut (-16.9 came out at -13.6). The measured values are applied linearly.
+    two_pass = (f"loudnorm=I={target}:TP=-2.0:LRA=11"
+                f":measured_I={before['lufs']}:measured_TP={before['tp']}"
+                f":measured_LRA={before.get('lra', 0.0)}:measured_thresh={before.get('thresh', -70.0)}"
+                f":linear=true:print_format=summary")
     r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(path),
-                        "-c:v", "copy", "-af",
-                        f"loudnorm=I={target}:TP=-1.5:LRA=11",
+                        "-c:v", "copy", "-af", two_pass,
                         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(tmp)],
                        capture_output=True, text=True)
     if r.returncode != 0:

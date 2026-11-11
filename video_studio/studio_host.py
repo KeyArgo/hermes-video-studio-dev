@@ -42,6 +42,57 @@ def status():
     return {"ok": True, "plugin": "hewn-video-studio", "workspace": str(MOTION)}
 
 
+def _install_reaper() -> None:
+    """A host that dies must not leave renderers behind."""
+    import atexit
+    import signal
+
+    from video_studio import jobs
+
+    def _bye(*_a):
+        try:
+            jobs.reap_all(wait=3.0)
+        finally:
+            pass
+
+    atexit.register(_bye)
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            prev = signal.getsignal(sig)
+            signal.signal(sig, lambda s, f, _p=prev: (_bye(), os._exit(0)))
+        except Exception:
+            pass
+
+
+try:
+    _install_reaper()
+except Exception:
+    pass
+
+
+@app.post("/api/host/close")
+def host_close():
+    """Stop the studio deliberately: kill every render first, then exit.
+
+    Closing the window is not the same as stopping the work. Renders run in their own process
+    groups, so without this they keep burning cores with nothing on screen to say so.
+    """
+    from video_studio import jobs
+    reaped = jobs.reap_all()
+    _write_state_gone()
+    import threading
+    threading.Timer(0.4, lambda: os._exit(0)).start()
+    return {"ok": True, **reaped}
+
+
+def _write_state_gone():
+    try:
+        from video_studio.host_launcher import state_path
+        state_path().unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 @app.get("/api/preflight")
 def preflight():
     """What this install can do, and the exact command for anything missing."""

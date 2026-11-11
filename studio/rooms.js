@@ -683,6 +683,28 @@
   }
 
   // A fresh install should be able to say exactly what it is missing.
+  // A render must be visible and stoppable from the page that started it.
+  function pollJobs() {
+    api('/jobs').then(function (d) {
+      var n = (d.jobs || []).filter(function (j) { return j.alive }).length
+      var box = document.getElementById('job-note')
+      if (!box) return
+      box.innerHTML = ''
+      if (!n) { box.textContent = ''; return }
+      box.appendChild(el('span', { class: 'mono-dim', text: n + ' render' + (n > 1 ? 's' : '') + ' running' }))
+      ;(d.jobs || []).filter(function (j) { return j.alive }).forEach(function (j) {
+        var stop = el('button', { class: 'btn small danger', text: 'Stop ' + j.kind })
+        stop.addEventListener('click', function () {
+          stop.disabled = true
+          api('/jobs/' + j.id + '/cancel', { method: 'POST', body: '{}' })
+            .then(function () { status('Stopped ' + j.kind) })
+            .catch(function (e) { status('Could not stop it: ' + e.message) })
+        })
+        box.appendChild(stop)
+      })
+    }).catch(function () {})
+  }
+
   function loadPreflight() {
     var box = document.getElementById('preflight-box')
     if (!box) return
@@ -776,6 +798,7 @@
     var rv = $('btn-review'); if (rv) rv.addEventListener('click', runReview)
     var fb = $('btn-fit-beats'); if (fb) fb.addEventListener('click', fitBeats)
     loadBeatNote()
+    pollJobs(); setInterval(pollJobs, 4000)
     var pl = $('player')
     if (pl) pl.addEventListener('timeupdate', function () {
       var at = $('review-at'); if (at) at.textContent = 'at ' + (pl.currentTime || 0).toFixed(1) + 's'

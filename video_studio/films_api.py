@@ -216,22 +216,37 @@ def build_index(fid: str):
     return r
 
 
-def _job(fid: str, kind: str, cmd: list[str]) -> str:
+def _job(fid: str, kind: str, cmd: list[str], cwd: str | None = str(FILM_DIR)) -> str:
+    """Start a renderer as a *tracked process group*, not a fire-and-forget thread.
+
+    A render that outlives the window is the bug this exists to prevent: the child now has its own
+    process group, a pid in the registry (`/api/jobs`), a cancel action, and it is reaped when the
+    host shuts down. It also runs under `nice` so an export cannot starve the desktop.
+    """
+    from . import jobs
+
     jid = uuid.uuid4().hex[:12]
+    started = jobs.start(kind, cmd, film=fid, cwd=cwd, job_id=jid)
     with _lock:
         _jobs[jid] = {"id": jid, "film": fid, "kind": kind, "state": "running",
-                      "started": time.time(), "cmd": cmd, "tail": ""}
+                      "started": time.time(), "cmd": cmd, "pid": started["pid"], "tail": ""}
+
+    proc = started["proc"]
 
     def work():
         try:
-            r = _run(cmd, 1800)
+            out, err = proc.communicate(timeout=1800)
+            ok = proc.returncode == 0
             with _lock:
-                _jobs[jid].update({"state": "done" if r["ok"] else "failed",
-                                   "ok": r["ok"], "rc": r["rc"],
-                                   "seconds": r["seconds"], "tail": r["tail"]})
+                _jobs[jid].update({"state": "done" if ok else "failed", "ok": ok,
+                                   "rc": proc.returncode,
+                                   "seconds": round(time.time() - _jobs[jid]["started"], 1),
+                                   "tail": ((out or "") + (err or ""))[-1500:]})
+            jobs.finish(jid, "done" if ok else "failed", ((err or "") + (out or ""))[-300:])
         except Exception as exc:  # noqa: BLE001
             with _lock:
                 _jobs[jid].update({"state": "failed", "ok": False, "tail": str(exc)})
+            jobs.finish(jid, "failed", str(exc))
 
     threading.Thread(target=work, daemon=True).start()
     return jid
@@ -332,6 +347,26 @@ def render_shot(fid: str, bid: str):
     return {"job": jid, "output": out}
 
 
+@router.get("/jobs")
+def jobs_active():
+    """What this studio is rendering right now — with a measured CPU figure per process."""
+    from . import jobs
+    return jobs.idle_report()
+
+
+@router.post("/jobs/{jid}/cancel")
+def jobs_cancel(jid: str):
+    """Stop a render: SIGTERM to its process group, then SIGKILL if it will not go."""
+    from . import jobs
+    result = jobs.cancel(jid)
+    with _lock:
+        if jid in _jobs:
+            _jobs[jid].update({"state": "cancelled"})
+    if not result.get("ok"):
+        raise HTTPException(status_code=409, detail=result)
+    return result
+
+
 @router.get("/jobs/{jid}")
 def job(jid: str):
     with _lock:
@@ -341,7 +376,7 @@ def job(jid: str):
         return dict(j)
 
 
-def _beat_context(fid: str) -> dict:
+def _beat_context(fid: str, offset_override: float | None = None) -> dict:
     """Tempo, phase and grid for a film's music — everything beat-fit needs, resolved once."""
     from . import beatfit, music
 
@@ -357,7 +392,14 @@ def _beat_context(fid: str) -> dict:
     if not bpm:
         raise HTTPException(status_code=409,
                             detail=f"'{track.get('title')}' carries no bpm, so there is no beat grid to fit")
+    fitted = (_load(fid).get("beat_fit") or {})
+    if offset_override is None and fitted.get("offset") is not None:
+        offset_override = float(fitted["offset"])     # the fit that was applied wins over a re-measure
     phase = beatfit.offset(Path(track["path"]), float(ptr.get("start") or 0.0), float(bpm))
+    if offset_override is not None:
+        # a measured phase is a suggestion: the person can hear the downbeat better than a
+        # spectral-flux peak picker can on a busy mix, so an explicit offset always wins
+        phase = {"offset": float(offset_override), "source": "manual", "confidence": 1.0}
     total = float(data.get("total") or sum(float(b.get("duration") or 0) for b in data.get("beats") or []))
     boundaries, acc = [], 0.0
     for b in data.get("beats") or []:
@@ -370,11 +412,11 @@ def _beat_context(fid: str) -> dict:
 
 
 @router.get("/films/{fid}/beat-grid")
-def beat_grid(fid: str):
+def beat_grid(fid: str, offset: float | None = None):
     """The beat grid under this film, and how many of its cuts already land on it."""
     from . import beatfit
 
-    ctx = _beat_context(fid)
+    ctx = _beat_context(fid, offset)
     grid = beatfit.grid(ctx["total"], ctx["bpm"], ctx["offset"])
     marks = beatfit.on_beat(ctx["boundaries"], ctx["bpm"], ctx["offset"])
     return {**{k: ctx[k] for k in ("film", "bpm", "offset", "offset_source", "confidence",
@@ -395,7 +437,7 @@ def fit_to_beats(fid: str, body: dict | None = None):
     from . import beatfit
 
     body = body or {}
-    ctx = _beat_context(fid)
+    ctx = _beat_context(fid, body.get("offset"))
     data = _load(fid)
     current = [float(b.get("duration") or 0) for b in data.get("beats") or []]
     before = beatfit.on_beat(ctx["boundaries"], ctx["bpm"], ctx["offset"])
