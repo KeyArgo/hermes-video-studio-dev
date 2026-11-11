@@ -256,7 +256,9 @@ def normalise_audio(path: Path, low: float = -18.0, high: float = -14.0,
     two_pass = (f"loudnorm=I={target}:TP=-2.0:LRA=11"
                 f":measured_I={before['lufs']}:measured_TP={before['tp']}"
                 f":measured_LRA={before.get('lra', 0.0)}:measured_thresh={before.get('thresh', -70.0)}"
-                f":linear=true:print_format=summary")
+                # a COMMA chains a second filter; a colon would append these as loudnorm options,
+                # which is why the peak stayed at -0.8 dBTP while the level looked right
+                f",linear=true,alimiter=limit=0.63:attack=5:release=50")
     r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(path),
                         "-c:v", "copy", "-af", two_pass,
                         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(tmp)],

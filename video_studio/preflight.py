@@ -23,6 +23,16 @@ OPTIONAL_PY = {
 }
 
 
+def _workspace() -> Path:
+    for env in ("VIDEO_STUDIO_WORKSPACE", "VIDEO_STUDIO_MOTION"):
+        if os.environ.get(env):
+            return Path(os.environ[env]).expanduser()
+    for candidate in (Path.home() / "VideoStudio", Path.home() / "Development" / "hewn-motion"):
+        if (candidate / "films").is_dir():
+            return candidate
+    return Path.home() / "VideoStudio"
+
+
 def _py_dep(name: str) -> bool:
     try:
         __import__(name)
@@ -73,10 +83,9 @@ def check() -> dict:
         {"id": "recorder", "ok": bool(recorder), "optional": True,
          "detail": recorder or "wf-recorder not installed — desktop capture is unavailable",
          "fix": "sudo zypper install wf-recorder (optional: browser capture needs nothing)"},
-        {"id": "workspace", "ok": bool(os.environ.get("VIDEO_STUDIO_MOTION") or
-                                       (Path.home() / "Development/hewn-motion").is_dir()),
-         "detail": os.environ.get("VIDEO_STUDIO_MOTION") or str(Path.home() / "Development/hewn-motion"),
-         "fix": "set VIDEO_STUDIO_MOTION to a folder for films and renders"},
+        {"id": "workspace", "ok": True,
+         "detail": str(_workspace()),
+         "fix": "set VIDEO_STUDIO_WORKSPACE to choose where films and renders are kept"},
     ]
     blocking = [r for r in rows if not r["ok"] and not r.get("optional")]
     return {

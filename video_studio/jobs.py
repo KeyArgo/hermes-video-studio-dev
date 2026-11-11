@@ -194,6 +194,36 @@ def reap_all(wait: float = 5.0) -> dict:
     return {"stopped": stopped, "already_gone": already}
 
 
+def gc(keep: int = 20, max_age_hours: float = 24.0) -> dict:
+    """Tidy the registry: drop finished entries that are old or surplus, never a live one.
+
+    A registry that only grows is its own leak — after a few days the file is a history of every
+    render ever run, and `list_active` walks all of it on every poll.
+    """
+    data = _read()
+    now = time.time()
+    live, dead = {}, []
+    for job_id, job in data.items():
+        if _alive(job.get("pid")):
+            live[job_id] = job
+        else:
+            dead.append(job)
+    dead.sort(key=lambda j: j.get("started", 0), reverse=True)
+    kept = [j for j in dead if now - j.get("started", 0) < max_age_hours * 3600][:keep]
+    for job in kept:
+        live[job["id"]] = job
+    removed = len(data) - len(live)
+    _write(live)
+    return {"kept": len(live), "removed": removed, "live": sum(1 for j in live.values() if _alive(j.get("pid")))}
+
+
+def startup_cleanup() -> dict:
+    """Called when the host starts: nothing from a previous run may still be burning a core."""
+    reaped = reap_all(wait=2.5)
+    tidied = gc()
+    return {"reaped": reaped, "registry": tidied}
+
+
 def idle_report() -> dict:
     """How much this plugin costs when it is doing nothing — measured, not asserted."""
     host_pid = os.getpid()

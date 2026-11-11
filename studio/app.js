@@ -47,7 +47,8 @@
     status('Loading films…')
     api('/films').then(function (r) {
       state.films = r.films || []
-      $('rail-foot').textContent = r.workspace || ''
+      // the folder the films live in, by name — a home path in the corner reads as a dev build
+      $('rail-foot').textContent = r.workspace ? 'workspace · ' + String(r.workspace).split('/').filter(Boolean).pop() : ''
       renderFilms()
       if (state.films.length && !state.id) openFilm(state.films[0].id)
       else status('Ready')

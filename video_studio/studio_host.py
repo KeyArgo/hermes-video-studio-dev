@@ -69,6 +69,14 @@ try:
 except Exception:
     pass
 
+# A crashed or killed host leaves children behind. Coming back up is the moment to prove the
+# studio holds nothing it does not own: reap what a previous run left, then tidy the registry.
+try:
+    from video_studio import jobs as _jobs
+    _startup = _jobs.startup_cleanup()
+except Exception:
+    _startup = {"error": "startup cleanup unavailable"}
+
 
 @app.post("/api/host/close")
 def host_close():

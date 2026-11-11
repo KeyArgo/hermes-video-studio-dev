@@ -1,6 +1,6 @@
 """Films backend — the HyperFrames side of Video Studio.
 
-A *film* is `films/<id>.json` in the motion workspace (`~/Development/hewn-motion`
+A *film* is `films/<id>.json` in the workspace (`$VIDEO_STUDIO_WORKSPACE`, else `~/VideoStudio`
 by default): an ordered list of beats, each pointing at one shot composition.
 This router lets the tab list films, read and edit a shot's HTML, re-render one
 shot, render the whole film, run the quality gate, and stream the result.
@@ -26,13 +26,23 @@ from fastapi.responses import FileResponse
 router = APIRouter()
 
 def _pick_workspace() -> Path:
-    """Env override, else the user's motion project, else the bundled demo film."""
-    env = os.environ.get("VIDEO_STUDIO_MOTION")
-    if env:
-        return Path(env).expanduser()
-    real = Path.home() / "Development" / "hewn-motion"
-    if (real / "films").is_dir():
-        return real
+    """Where films and renders live: env override, else a neutral folder, else a legacy one.
+
+    The product's own name is Video Studio; an older install may still have its work in a folder
+    named after a retired codename. That legacy folder is honoured if it exists — nobody's films
+    should vanish over a rename — but new installs get `~/VideoStudio`, and nothing in the UI or
+    docs calls this product by the old name.
+    """
+    for env in ("VIDEO_STUDIO_WORKSPACE", "VIDEO_STUDIO_MOTION"):
+        value = os.environ.get(env)
+        if value:
+            return Path(value).expanduser()
+    fresh = Path.home() / "VideoStudio"
+    if (fresh / "films").is_dir():
+        return fresh
+    legacy = Path.home() / "Development" / "hewn-motion"      # pre-rename work, if present
+    if (legacy / "films").is_dir():
+        return legacy
     return Path(__file__).resolve().parent.parent / "demo" / "film"
 
 
@@ -299,6 +309,11 @@ def beat_from_footage(fid: str, bid: str, body: dict | None = None):
     if seconds <= 0:
         raise HTTPException(status_code=400, detail="beat has no duration")
 
+    # A source shorter than the beat would freeze on its last frame for the remainder, and a
+    # frozen second is exactly what the motion check exists to catch. Loop the source instead.
+    src_seconds = _probe_duration(src)
+    loop = ["-stream_loop", "-1"] if src_seconds and seconds > src_seconds + 0.05 else []
+
     # a screen recording is mostly still; the cut needs motion in every second, so the frame
     # is scaled 4% larger and slowly panned — the standard treatment for screen footage
     big_w, big_h = int(1920 * 1.04), int(1080 * 1.04)
@@ -315,7 +330,7 @@ def beat_from_footage(fid: str, bid: str, body: dict | None = None):
 
     SHOTS_OUT.mkdir(parents=True, exist_ok=True)
     dest = SHOTS_OUT / f"{bid}.mp4"
-    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{start:.3f}", "-i", str(src),
+    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{start:.3f}", *loop, "-i", str(src),
                         "-t", f"{seconds:.3f}", "-vf", ",".join(filt), "-an",
                         "-c:v", "libx264", "-preset", "medium", "-crf", "18",
                         "-pix_fmt", "yuv420p", str(dest)], capture_output=True, text=True)
@@ -412,6 +427,16 @@ def job(jid: str):
         if not j:
             raise HTTPException(status_code=404, detail="no such job")
         return dict(j)
+
+
+def _probe_duration(path: Path) -> float:
+    """The real length of a clip, so a beat is never longer than its source."""
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                        "-of", "default=nw=1:nk=1", str(path)], capture_output=True, text=True)
+    try:
+        return float((r.stdout or "0").strip() or 0)
+    except ValueError:
+        return 0.0
 
 
 def _beat_context(fid: str, offset_override: float | None = None) -> dict:
