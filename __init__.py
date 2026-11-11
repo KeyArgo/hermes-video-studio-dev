@@ -1,4 +1,4 @@
-"""Hewn Video Studio — plugin glue.
+"""Video Studio Video Studio — plugin glue.
 
 One tool, `video_studio`, over the same service layer the dashboard tab calls.
 That is deliberate: the agent and the person edit the *same* project file, so a
@@ -102,7 +102,7 @@ def tool_video_studio(args: dict, **kw) -> str:
 SCHEMA_VIDEO_STUDIO = {
     "name": "video_studio",
     "description": (
-        "Edit video in Hewn Video Studio: a non-destructive timeline the person can "
+        "Edit video in Video Studio Video Studio: a non-destructive timeline the person can "
         "also see and click. Workflow: projects/new/open -> analyze -> cut -> render.\n\n"
         "Times are ALWAYS seconds on the current timeline (after existing edits), "
         "not source time. Actions: projects (list) · open (project view) · new "

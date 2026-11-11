@@ -13,7 +13,7 @@ nothing, and uses the user's own GPUs.
 ## 1. First five minutes of the next session
 
 ```bash
-cd ~/Development/hewn-video-studio && ./scripts/deploy.sh    # copy → stamp → restart host (one command)
+cd ~/Development/video-studio && ./scripts/deploy.sh    # copy → stamp → restart host (one command)
 python3 -c "import json,urllib.request;print(json.dumps(json.load(urllib.request.urlopen('http://127.0.0.1:36659/api/version')),indent=1))"
 python3 -c "import json,urllib.request;print([f['id'] for f in json.load(urllib.request.urlopen('http://127.0.0.1:36659/api/films'))['films']])"
 ```
@@ -65,13 +65,13 @@ bed into the film; **Music Studio** supplies real tracks; **Playwright** records
 | Build | read it, do not trust this file: `GET /api/version` or the header chip (at handover: `1.0.0-dev.22+`) |
 | Repo | `KeyArgo/hermes-video-studio-dev`, private, master `e64be36`, ~23 commits |
 | Tests | **82 green + 6 card checks** — studio side: timeline/script 17, assets/comfy 10, gen_beat 9, assemble 5, music/drafts 9, review 13, legacy 15; EDL side: cards 4, card-ops 6/6 |
-| Studio host | `127.0.0.1:36659`, state in `~/.hermes/plugin-data/hewn-video-studio/studio-host.json` |
+| Studio host | `127.0.0.1:36659`, state in `~/.hermes/plugin-data/video-studio/studio-host.json` |
 | Routes | 55 (`GET /openapi.json`) |
 | Music Studio | `127.0.0.1:8775`, linked both ways, 4 takes available |
 | ComfyUI | sparke `10.0.0.52:8188`, H3 fp8 + Wan I2V + Music3, no image checkpoint |
 | Local model lanes | DeepSeek V4.1 Flash `10.0.0.50:8890`, Ollama `10.0.0.52:11434` (43B q6, dsv4 q2k) |
 
-Films in `~/Development/hewn-motion/films/`:
+Films in `~/Development/VideoStudio/films/`:
 
 | Film | Total | Beats | State |
 |---|---|---|---|
@@ -131,7 +131,7 @@ vignette, dark palette). The gate is what catches it.
 
 ```bash
 # deploy (copy + stamp + restart) — the installed tree does NOT follow the source
-cd ~/Development/hewn-video-studio && ./scripts/deploy.sh
+cd ~/Development/video-studio && ./scripts/deploy.sh
 
 # tests
 python3 tests/run_tests.py            # legacy 15
@@ -170,7 +170,7 @@ source stamp (never `-dev.0`).
    design (−36 LUFS); `mlt_project.normalise_audio` fixes the cut to −18…−14.
 7. **Timeline vs film is unresolved.** `from-film` seeds V1; editing the timeline does not write
    back to `films/<id>.json`. Decide which is authoritative before wiring both editable.
-8. **Plugin id mismatch** — repo `hermes-video-studio-dev`, internal id `hewn-video-studio`. Harmless;
+8. **Plugin id mismatch** — repo `hermes-video-studio-dev`, internal id `video-studio`. Harmless;
    leave until after the deadline.
 9. **`~/.hermes/config.yaml` is agent-immutable** — the user must run `hermes config set …`.
 10. **MoA stays off** (its aggregator bills Claude Opus).
@@ -200,20 +200,20 @@ source stamp (never `-dev.0`).
 ## 9. Paths, ports, environment
 
 ```
-plugin source      ~/Development/hewn-video-studio            (git → KeyArgo/hermes-video-studio-dev)
-installed copy     ~/.hermes/plugins/hewn-video-studio        (copied; deploy.sh keeps it in sync)
-desktop pane       ~/.hermes/desktop-plugins/hewn-video-studio/plugin.js
-motion workspace   ~/Development/hewn-motion                  (VIDEO_STUDIO_MOTION overrides)
+plugin source      ~/Development/video-studio            (git → KeyArgo/hermes-video-studio-dev)
+installed copy     ~/.hermes/plugins/video-studio        (copied; deploy.sh keeps it in sync)
+desktop pane       ~/.hermes/desktop-plugins/video-studio/plugin.js
+motion workspace   ~/Development/VideoStudio                  (VIDEO_STUDIO_MOTION overrides)
   films/           film JSON: beats, renderer per beat, treatment, music pointer
   film/            HyperFrames project (index.html + compositions/)
   renders/         <film>-final.mp4, shots/<beat>.mp4, drafts/, captures/, reviews/
   assets/stills/   drop generated stills here → /stills/scan
 music store        ~/.hermes/plugin-data/hermes-music-studio  (read-only; MUSIC_STORE overrides)
-studio host state  ~/.hermes/plugin-data/hewn-video-studio/studio-host.json
+studio host state  ~/.hermes/plugin-data/video-studio/studio-host.json
 models overlay     <motion workspace>/models.json             (adds/overrides /models entries)
 ```
 
-Gate implementation: `~/Development/hewn-motion/tools/gate.py` (hook with centre-crop + dark-but-lit
+Gate implementation: `~/Development/VideoStudio/tools/gate.py` (hook with centre-crop + dark-but-lit
 rule, motion per second at 320×180, audio −18…−14 LUFS & TP ≤ −1, legibility from composition CSS,
 in-progress guard).
 
@@ -236,7 +236,7 @@ in-progress guard).
 
 ---
 
-## 11. This session's commits (`hewn-video-studio`, newest first)
+## 11. This session's commits (`video-studio`, newest first)
 
 `dc1d543` review + capture deps/install · `55ab205` desktop capture route + window discovery ·
 `852d1d9` capture.desktop with honest failure · `ddcf4f5` versioning + deploy script ·
@@ -245,6 +245,6 @@ cinematic treatment + gate audio/letterbox/in-progress · `870487e` music bridge
 cross-links · `c1bd809` gen_beat timing · `54dc296` generated beats + assembly + audio normalise ·
 `08314cf` docs correction.
 
-`hewn-motion`: `c7d79b4` footage beat · `7a11a50` gate (audio, centre-crop, dark-but-lit,
+`VideoStudio`: `c7d79b4` footage beat · `7a11a50` gate (audio, centre-crop, dark-but-lit,
 in-progress) + hook shot visible at frame 0 · `d0c17c1` music bed + drafts · `967a196` audio gate +
 mixed-engine film · `65a380f` film passes gate.

@@ -1,6 +1,6 @@
 # Limits
 
-What Hewn Cut does not do. Written down because a demo is only believable if the
+What Video Studio does not do. Written down because a demo is only believable if the
 edges are stated.
 
 - **One video track.** No picture-in-picture, no overlays on top of the footage

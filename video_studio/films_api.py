@@ -40,7 +40,7 @@ def _pick_workspace() -> Path:
     fresh = Path.home() / "VideoStudio"
     if (fresh / "films").is_dir():
         return fresh
-    legacy = Path.home() / "Development" / "hewn-motion"      # pre-rename work, if present
+    legacy = Path.home() / "Development" / "VideoStudio"      # pre-rename work, if present
     if (legacy / "films").is_dir():
         return legacy
     return Path(__file__).resolve().parent.parent / "demo" / "film"
@@ -316,7 +316,10 @@ def beat_from_footage(fid: str, bid: str, body: dict | None = None):
 
     # a screen recording is mostly still; the cut needs motion in every second, so the frame
     # is scaled 4% larger and slowly panned — the standard treatment for screen footage
-    big_w, big_h = int(1920 * 1.04), int(1080 * 1.04)
+    # the pan is the motion the gate measures on screen footage: 4 % reads as still at 320x180,
+    # so the amount is a parameter with a floor of 0.04 and a sane ceiling
+    overscan = min(0.20, max(0.04, float(body.get("pan") or 0.08)))
+    big_w, big_h = int(1920 * (1 + overscan)), int(1080 * (1 + overscan))
     filt = [f"scale={big_w}:{big_h}:flags=lanczos", "fps=30", "setsar=1",
             f"crop=1920:1080:x='(iw-1920)*t/{seconds:.3f}':y='(ih-1080)*t/{seconds:.3f}'"]
     if body.get("letterbox", True):

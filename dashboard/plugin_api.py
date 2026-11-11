@@ -1,6 +1,6 @@
-"""Dashboard backend, mounted by Hermes under /api/plugins/hewn-video-studio.
+"""Dashboard backend, mounted by Hermes under /api/plugins/video-studio.
 
-Same shape as the other Hewn studios: a thin router over the service layer, so
+Same shape as the other Video Studio studios: a thin router over the service layer, so
 the tab, the agent tool and the CLI all execute identical code.
 """
 import os

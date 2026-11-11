@@ -1,4 +1,4 @@
-"""Hewn Cut — a non-destructive edit list an agent can operate.
+"""Video Studio — a non-destructive edit list an agent can operate.
 
 Why this shape and not "a video editor": an agent is bad at judging footage and
 worse at holding state. It is good at emitting one small declarative operation
@@ -513,7 +513,7 @@ class Project:
         if not segs:
             raise ValueError("nothing left to render")
         info = probe(self.source)
-        tmp = tempfile.mkdtemp(prefix="hewncut-")
+        tmp = tempfile.mkdtemp(prefix="video-studio-")
         try:
             graph, labels = [], []
             # one input per distinct card image, so five cards cost one PNG decode
@@ -643,7 +643,7 @@ class Project:
         import tempfile
         segs, _ = self.timeline()
         total = sum(s["duration"] for s in segs)
-        tmp = tempfile.mkdtemp(prefix="hewncut-audio-")
+        tmp = tempfile.mkdtemp(prefix="video-studio-audio-")
         try:
             wav = self.timeline_audio(os.path.join(tmp, "timeline.wav"))
             spans = _silences(wav, noise_db, min(min_silence, 0.45))

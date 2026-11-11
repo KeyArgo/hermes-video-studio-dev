@@ -245,27 +245,32 @@ def normalise_audio(path: Path, low: float = -18.0, high: float = -14.0,
     if not before:
         return {"audio": "none"}
     # Inside the loudness band is not the whole check: a cut can average -16.9 LUFS and still
-    # peak at -0.8 dBTP, which the gate fails and a listener hears as clipping. Peaks are fixed
-    # here too, or the "already in band" shortcut ships a broken mix.
+    # peak at -0.8 dBTP, which the gate fails and a listener hears as clipping.
+    #
+    # This is a *static gain*, not loudnorm. loudnorm's measured/linear path moved a 60 s mix from
+    # -16.9 to -10.5 LUFS with a +1.0 dBTP peak on this machine, which is worse than doing nothing.
+    # A fixed gain is arithmetic that can be checked: move the level by (target - measured), but
+    # never by more than the peak headroom allows, and leave 1.5 dB for the encoder.
     peak = before.get("tp", -99.0)
     if low <= before["lufs"] <= high and peak <= -1.2:
         return {"audio": "already in band", **before}
+    gain = target - before["lufs"]
+    ceiling = -1.5
+    if peak > -99:
+        gain = min(gain, ceiling - peak)          # do not push the peak past the ceiling
     tmp = path.with_suffix(".norm.mp4")
-    # Two-pass loudnorm. Single-pass mode rides the gain while it measures, which overshot by
-    # 3 dB on a 60 s cut (-16.9 came out at -13.6). The measured values are applied linearly.
-    two_pass = (f"loudnorm=I={target}:TP=-2.0:LRA=11"
-                f":measured_I={before['lufs']}:measured_TP={before['tp']}"
-                f":measured_LRA={before.get('lra', 0.0)}:measured_thresh={before.get('thresh', -70.0)}"
-                # a COMMA chains a second filter; a colon would append these as loudnorm options,
-                # which is why the peak stayed at -0.8 dBTP while the level looked right
-                f",linear=true,alimiter=limit=0.63:attack=5:release=50")
     r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(path),
-                        "-c:v", "copy", "-af", two_pass,
+                        "-c:v", "copy", "-af", f"volume={gain:.2f}dB",
                         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(tmp)],
                        capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"audio normalise failed: {r.stderr[-300:]}")
     tmp.replace(path)
+    after = _measure_loudness(path)
+    return {"audio": "normalised", "gain_db": round(gain, 2),
+            "before_lufs": before["lufs"], "after_lufs": after.get("lufs"),
+            "after_tp": after.get("tp")}
+
     after = _measure_loudness(path)
     return {"audio": "normalised", "before_lufs": before["lufs"], "after_lufs": after.get("lufs")}
 

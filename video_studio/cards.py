@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Card renderer — title / limit / end, in the Hewn brand grammar.
+"""Card renderer — title / limit / end, in the Video Studio brand grammar.
 
 Brand grammar (from ~/Vaults/hackathons/2026-11-11-brand-and-seven-videos.md):
   bg #0b0d10 · one accent per product · Inter + JetBrains Mono · no gradients · restraint.
@@ -46,7 +46,7 @@ def page(kind, s):
     claim = html.escape(s.get("claim", ""))
     install = html.escape(s.get("install", ""))
     limit = html.escape(s.get("limit", ""))
-    studio = html.escape(s.get("studio", "Hewn"))
+    studio = html.escape(s.get("studio", "Video Studio"))
     foot = html.escape(s.get("footnote", "Plugin Hackathon · Nov 2026"))
 
     if kind == "title":
@@ -89,7 +89,7 @@ def render(spec, kind, outdir):
 
 def render_card(out_png: str, kind: str = "title", *, title: str, subtitle: str = "",
                 claim: str = "", install: str = "", limit: str = "",
-                accent: str = ACCENT_DEFAULT, studio: str = "Hewn") -> str:
+                accent: str = ACCENT_DEFAULT, studio: str = "Video Studio") -> str:
     """Render one card to out_png and return the path.
 
     kind: 'title' | 'limit' | 'end'. Raises ValueError for anything else and

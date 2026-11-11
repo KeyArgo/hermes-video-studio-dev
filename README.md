@@ -34,7 +34,7 @@ command that fixes it:
 | `melt` (MLT) | the multi-track cut | falls back to ffmpeg concat |
 | `node` / `npx` | typed shots via `hyperframes` | `npx hyperframes` renders on demand |
 | `wf-recorder` | recording apps that are not web pages | optional — browser capture needs nothing |
-| `VIDEO_STUDIO_MOTION` | where films and renders live | defaults to `~/Development/hewn-motion` |
+| `VIDEO_STUDIO_MOTION` | where films and renders live | defaults to `~/Development/VideoStudio` |
 
 Nothing else is required: no account, no upload, no cloud.
 
@@ -61,9 +61,9 @@ so replay never touches ffmpeg.
 
 ```bash
 hermes plugins install KeyArgo/hermes-video-studio-dev   # public repo, no account needed
-# or locally: cp -r . ~/.hermes/plugins/hewn-video-studio
-hermes plugins validate hewn-video-studio
-hermes plugins enable hewn-video-studio          # tools and the tab load on the next session
+# or locally: cp -r . ~/.hermes/plugins/video-studio
+hermes plugins validate video-studio
+hermes plugins enable video-studio          # tools and the tab load on the next session
 ```
 
 The agent then has one tool, `video_studio`, and the dashboard gets a **Video Studio**
@@ -71,7 +71,7 @@ tab with two rooms.
 
 Needs `ffmpeg` on PATH. The **Films** room additionally runs [HyperFrames]
 (`npx hyperframes`, node >= 22, fetched on first render) against a motion workspace —
-`$VIDEO_STUDIO_MOTION`, else `~/Development/hewn-motion`, else the bundled demo film, so
+`$VIDEO_STUDIO_MOTION`, else `~/Development/VideoStudio`, else the bundled demo film, so
 the room is never empty on a fresh install.
 
 ### Films room
@@ -113,11 +113,11 @@ gap > 0.4 s · **motion in the first 5 s**.
 ## CLI (same operations, for testing without the agent)
 
 ```bash
-python3 -m hewn_cut.cli analyze demo/before.mp4     # 3 pauses, 5.8s removable
-python3 -m hewn_cut.cli new     demo/before.mp4 demo/project.json
-python3 -m hewn_cut.cli tighten demo/project.json   # 20.00s -> 14.20s
-python3 -m hewn_cut.cli render  demo/project.json demo/after.mp4
-python3 -m hewn_cut.cli undo    demo/project.json
+python3 -m video-studio cli analyze demo/before.mp4     # 3 pauses, 5.8s removable
+python3 -m video-studio cli new     demo/before.mp4 demo/project.json
+python3 -m video-studio cli tighten demo/project.json   # 20.00s -> 14.20s
+python3 -m video-studio cli render  demo/project.json demo/after.mp4
+python3 -m video-studio cli undo    demo/project.json
 ```
 
 `demo/before.mp4` (20 s) and `demo/after.mp4` (14.2 s) are the proof pair.
@@ -128,8 +128,8 @@ python3 -m hewn_cut.cli undo    demo/project.json
 |---|---|
 | `plugin.yaml` | manifest: one tool, two config keys (`max_seconds`, `ffmpeg`) |
 | `__init__.py` | `register(ctx)`, the `video_cut` schema and dispatch |
-| `hewn_cut/edl.py` | project model, replay, render, verify, analyze — stdlib + ffmpeg only |
-| `hewn_cut/cli.py` | the same ops from a shell |
+| `video_studio/edl.py` | project model, replay, render, verify, analyze — stdlib + ffmpeg only |
+| `video_studio/cli.py` | the same ops from a shell |
 | `tests/run_tests.py` | 9 checks, builds its own fixture, no pytest needed |
 | `LIMITS.md` | what it cannot do (one track, no transitions, no ASR, …) |
 | `VERIFY.md` | every claim with the command that falsifies it |

@@ -23,11 +23,11 @@ if str(ROOT) not in sys.path:
 
 from dashboard.plugin_api import router  # noqa: E402
 
-app = FastAPI(title="Hewn Video Studio")
-app.include_router(router, prefix="/api/plugins/hewn-video-studio")
+app = FastAPI(title="Video Studio Video Studio")
+app.include_router(router, prefix="/api/plugins/video-studio")
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8">
-<title>Hewn Video Studio</title>
+<title>Video Studio Video Studio</title>
 <style>html,body{margin:0;height:100%;background:#0b0d10;overflow:hidden}#root{position:absolute;inset:0}</style>
 </head><body><div id="root"></div>
 <script src="/index.js"></script></body></html>"""
@@ -50,7 +50,7 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     a = ap.parse_args()
     import uvicorn
-    print(f"Hewn Video Studio → http://{a.host}:{a.port}/")
+    print(f"Video Studio Video Studio → http://{a.host}:{a.port}/")
     uvicorn.run(app, host=a.host, port=a.port, log_level="warning")
 
 

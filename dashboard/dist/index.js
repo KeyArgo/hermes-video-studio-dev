@@ -1,5 +1,5 @@
 // Hermes Video Studio — dashboard tab (plain IIFE, no build step).
-// Backend: /api/plugins/hewn-video-studio/* (dashboard/plugin_api.py).
+// Backend: /api/plugins/video-studio/* (dashboard/plugin_api.py).
 //
 // The UI is vanilla DOM inside a single React component, so the same file runs
 // in the dashboard tab and as a standalone page. Everything shown is a field the
@@ -7,7 +7,7 @@
 ;(function () {
   'use strict'
 
-  var PLUGIN = 'hewn-video-studio'
+  var PLUGIN = 'video-studio'
   var API = '/api/plugins/' + PLUGIN
   var TITLE = 'Video Studio'
 
@@ -224,7 +224,7 @@
     function renderTop() {
       var brandName = state.view ? state.view.title : TITLE
       return el('div', { class: 'hvs-top' }, [
-        el('div', { class: 'hvs-brand' }, ['Hewn ', el('i', null, ['Cut'])]),
+        el('div', { class: 'hvs-brand' }, ['Video Studio ', el('i', null, ['Cut'])]),
         el('div', { class: 'hvs-tag', text: brandName }),
         el('div', { class: 'hvs-spacer' }),
         el('button', {

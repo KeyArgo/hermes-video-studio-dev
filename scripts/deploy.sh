@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST="${HERMES_PLUGIN_DIR:-$HOME/.hermes/plugins/hewn-video-studio}"
+DEST="${HERMES_PLUGIN_DIR:-$HOME/.hermes/plugins/video-studio}"
 
 echo "→ $SRC ⇒ $DEST"
 mkdir -p "$DEST/video_studio" "$DEST/studio" "$DEST/tests"
@@ -36,7 +36,7 @@ print(json.loads(p.read_text()).get("version", "missing") if p.is_file() else "m
 PY
 
 # restart the loopback studio so new backend code is actually loaded
-STATE="$HOME/.hermes/plugin-data/hewn-video-studio/studio-host.json"
+STATE="$HOME/.hermes/plugin-data/video-studio/studio-host.json"
 if [ -f "$STATE" ]; then
   OLD_PID="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('pid',''))" "$STATE" 2>/dev/null || true)"
   [ -n "${OLD_PID:-}" ] && kill "$OLD_PID" 2>/dev/null || true

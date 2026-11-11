@@ -23,9 +23,9 @@ ROOT = Path(__file__).resolve().parent.parent
 def data_dir() -> Path:
     base = os.environ.get("HERMES_PLUGIN_DATA_DIR")
     if base:
-        return Path(base) / "hewn-video-studio"
+        return Path(base) / "video-studio"
     home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
-    return home / "plugin-data" / "hewn-video-studio"
+    return home / "plugin-data" / "video-studio"
 
 
 def state_path() -> Path:

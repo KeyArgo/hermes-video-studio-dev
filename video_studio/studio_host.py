@@ -39,7 +39,7 @@ app.include_router(timeline_router, prefix="/api")
 @app.get("/api/status")
 def status():
     from video_studio.films_api import MOTION
-    return {"ok": True, "plugin": "hewn-video-studio", "workspace": str(MOTION)}
+    return {"ok": True, "plugin": "video-studio", "workspace": str(MOTION)}
 
 
 def _install_reaper() -> None:

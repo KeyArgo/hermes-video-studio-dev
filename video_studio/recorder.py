@@ -39,7 +39,7 @@ import time
 from pathlib import Path
 
 STATE = Path(os.environ.get("HEWN_VIDEO_STUDIO_DATA") or
-             Path.home() / ".hermes/plugin-data/hewn-video-studio") / "recorder.json"
+             Path.home() / ".hermes/plugin-data/video-studio") / "recorder.json"
 
 # quality presets: screen content is flat colour and text, so ultrafast at crf 20 is visually
 # clean, and the recorder stays off the CPU of the thing being recorded (which must stay smooth).

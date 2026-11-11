@@ -27,7 +27,7 @@ def _workspace() -> Path:
     for env in ("VIDEO_STUDIO_WORKSPACE", "VIDEO_STUDIO_MOTION"):
         if os.environ.get(env):
             return Path(os.environ[env]).expanduser()
-    for candidate in (Path.home() / "VideoStudio", Path.home() / "Development" / "hewn-motion"):
+    for candidate in (Path.home() / "VideoStudio", Path.home() / "Development" / "VideoStudio"):
         if (candidate / "films").is_dir():
             return candidate
     return Path.home() / "VideoStudio"

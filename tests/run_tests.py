@@ -40,7 +40,7 @@ def fixture(dirpath):
 
 
 def main():
-    tmp = tempfile.mkdtemp(prefix="hewncut-tests-")
+    tmp = tempfile.mkdtemp(prefix="video-studio-tests-")
     src = fixture(tmp)
 
     def t_probe():

@@ -11,9 +11,9 @@
 import { ROUTES_AREA, SIDEBAR_NAV_AREA } from '@hermes/plugin-sdk'
 import { createElement as h, useCallback, useEffect, useState } from 'react'
 
-const PLUGIN_ID = 'hewn-video-studio'
+const PLUGIN_ID = 'video-studio'
 const PATH = '/video-studio'
-const STATE_REL = ['plugin-data', 'hewn-video-studio', 'studio-host.json']
+const STATE_REL = ['plugin-data', 'video-studio', 'studio-host.json']
 
 const wrap = { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }
 const frame = { flex: 1, width: '100%', border: 'none', display: 'block', background: 'transparent' }

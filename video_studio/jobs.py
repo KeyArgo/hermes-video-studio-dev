@@ -30,7 +30,7 @@ import time
 from pathlib import Path
 
 REGISTRY = Path(os.environ.get("HEWN_VIDEO_STUDIO_DATA") or
-                Path.home() / ".hermes/plugin-data/hewn-video-studio") / "render-jobs.json"
+                Path.home() / ".hermes/plugin-data/video-studio") / "render-jobs.json"
 
 NICE = int(os.environ.get("VIDEO_STUDIO_RENDER_NICE", "10"))     # 0 = no change, 19 = slowest
 CPUS = os.environ.get("VIDEO_STUDIO_RENDER_CPUS", "").strip()      # e.g. "0-3" — empty = all

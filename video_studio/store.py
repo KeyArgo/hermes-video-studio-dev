@@ -7,8 +7,8 @@ Nothing is a database. A project is a folder:
         renders/*.mp4     every render, kept, never overwritten
         waveform.png      cached peaks for the UI
 
-Root: $HEWN_VIDEO_STUDIO_HOME, else $XDG_STATE_HOME/hewn-video-studio,
-else ~/.local/state/hewn-video-studio.
+Root: $HEWN_VIDEO_STUDIO_HOME, else $XDG_STATE_HOME/video-studio,
+else ~/.local/state/video-studio.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def root() -> Path:
     if env:
         return Path(env).expanduser()
     base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
-    return Path(base) / "hewn-video-studio"
+    return Path(base) / "video-studio"
 
 
 def projects_dir() -> Path:

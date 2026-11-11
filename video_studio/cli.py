@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """CLI for the edit engine — same operations the agent's tool exposes.
 
-    python3 -m hewn_cut.cli probe    in.mp4
-    python3 -m hewn_cut.cli analyze  in.mp4
-    python3 -m hewn_cut.cli timeline project.json
-    python3 -m hewn_cut.cli snip     project.json 4.2 6.0
-    python3 -m hewn_cut.cli tighten  project.json
-    python3 -m hewn_cut.cli caption  project.json "text" 5.0 9.0
-    python3 -m hewn_cut.cli undo     project.json
-    python3 -m hewn_cut.cli render   project.json out.mp4
-    python3 -m hewn_cut.cli verify   out.mp4
-    python3 -m hewn_cut.cli --version
+    python3 -m video-studio cli probe    in.mp4
+    python3 -m video-studio cli analyze  in.mp4
+    python3 -m video-studio cli timeline project.json
+    python3 -m video-studio cli snip     project.json 4.2 6.0
+    python3 -m video-studio cli tighten  project.json
+    python3 -m video-studio cli caption  project.json "text" 5.0 9.0
+    python3 -m video-studio cli undo     project.json
+    python3 -m video-studio cli render   project.json out.mp4
+    python3 -m video-studio cli verify   out.mp4
+    python3 -m video-studio cli --version
 """
 import json
 import os
