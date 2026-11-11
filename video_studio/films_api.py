@@ -341,6 +341,95 @@ def job(jid: str):
         return dict(j)
 
 
+def _beat_context(fid: str) -> dict:
+    """Tempo, phase and grid for a film's music — everything beat-fit needs, resolved once."""
+    from . import beatfit, music
+
+    data = _load(fid)
+    ptr = data.get("music") or {}
+    if not ptr.get("track_id"):
+        raise HTTPException(status_code=409,
+                            detail="this film has no music yet — attach a track in the Music room")
+    track = music.find(ptr["track_id"])
+    if not track:
+        raise HTTPException(status_code=404, detail=f"track {ptr['track_id']} is not in the music library")
+    bpm = track.get("bpm")
+    if not bpm:
+        raise HTTPException(status_code=409,
+                            detail=f"'{track.get('title')}' carries no bpm, so there is no beat grid to fit")
+    phase = beatfit.offset(Path(track["path"]), float(ptr.get("start") or 0.0), float(bpm))
+    total = float(data.get("total") or sum(float(b.get("duration") or 0) for b in data.get("beats") or []))
+    boundaries, acc = [], 0.0
+    for b in data.get("beats") or []:
+        acc += float(b.get("duration") or 0)
+        boundaries.append(round(acc, 4))
+    return {"film": fid, "bpm": float(bpm), "offset": phase["offset"],
+            "offset_source": phase["source"], "confidence": phase["confidence"],
+            "total": total, "boundaries": boundaries, "track": track.get("title"),
+            "start": float(ptr.get("start") or 0.0)}
+
+
+@router.get("/films/{fid}/beat-grid")
+def beat_grid(fid: str):
+    """The beat grid under this film, and how many of its cuts already land on it."""
+    from . import beatfit
+
+    ctx = _beat_context(fid)
+    grid = beatfit.grid(ctx["total"], ctx["bpm"], ctx["offset"])
+    marks = beatfit.on_beat(ctx["boundaries"], ctx["bpm"], ctx["offset"])
+    return {**{k: ctx[k] for k in ("film", "bpm", "offset", "offset_source", "confidence",
+                                   "total", "track", "start")},
+            "beat": round(beatfit.beat_length(ctx["bpm"]), 4),
+            "grid": grid, "cuts": marks["cuts"], "on_beat": marks["on"], "on": marks["on"],
+            "of": marks["of"], "percent": marks["percent"], "tolerance": marks["tolerance"]}
+
+
+@router.post("/films/{fid}/fit-to-beats")
+def fit_to_beats(fid: str, body: dict | None = None):
+    """Snap every interior cut to the beat grid, keeping the film's length.
+
+    `dry_run` (default false) reports what would move without touching the film. Applying the
+    fit rewrites the beat durations, so the shots need re-rendering — the response says so
+    instead of leaving a film whose json no longer matches its clips.
+    """
+    from . import beatfit
+
+    body = body or {}
+    ctx = _beat_context(fid)
+    data = _load(fid)
+    current = [float(b.get("duration") or 0) for b in data.get("beats") or []]
+    before = beatfit.on_beat(ctx["boundaries"], ctx["bpm"], ctx["offset"])
+    fitted = beatfit.fit(current, ctx["bpm"], ctx["offset"],
+                         tolerance=float(body.get("tolerance") or beatfit.EPS))
+    if not fitted.get("ok"):
+        raise HTTPException(status_code=409, detail=fitted["reason"])
+
+    new_bounds, acc = [], 0.0
+    for d in fitted["durations"]:
+        acc += d
+        new_bounds.append(round(acc, 4))
+    after = beatfit.on_beat(new_bounds, ctx["bpm"], ctx["offset"])
+
+    result = {"film": fid, "bpm": ctx["bpm"], "beat": fitted["beat"], "offset": ctx["offset"],
+              "offset_source": ctx["offset_source"], "confidence": ctx["confidence"],
+              "before": {"percent": before["percent"], "on": before["on"], "of": before["of"]},
+              "after": {"percent": after["percent"], "on": after["on"], "of": after["of"]},
+              "moved": fitted["moved"], "durations": fitted["durations"], "dry_run": bool(body.get("dry_run"))}
+    if body.get("dry_run"):
+        return result
+    if not fitted["moved"]:
+        return {**result, "applied": False, "reason": "every cut was already on a beat"}
+
+    for beat, dur in zip(data.get("beats") or [], fitted["durations"]):
+        beat["duration"] = round(dur, 4)
+    data["total"] = round(sum(fitted["durations"]), 4)
+    data["beat_fit"] = {"bpm": ctx["bpm"], "offset": ctx["offset"],
+                        "offset_source": ctx["offset_source"], "applied_at": time.time()}
+    _save(fid, data)
+    return {**result, "applied": True, "needs_render": True,
+            "note": "shot durations changed — re-render the film so the clips match the cut"}
+
+
 @router.post("/films/{fid}/gate")
 def gate(fid: str):
     video = body_video = None
@@ -358,7 +447,19 @@ def gate(fid: str):
     r = subprocess.run(["python3", "-c", code, str(video)], capture_output=True, text=True, timeout=600)
     if r.returncode != 0:
         raise HTTPException(status_code=500, detail=(r.stdout + r.stderr)[-1500:])
-    return {"video": video.name, **json.loads(r.stdout.strip().splitlines()[-1])}
+    verdict = json.loads(r.stdout.strip().splitlines()[-1])
+    # beats are part of whether a cut feels edited rather than narrated — reported here, and
+    # absent (not failed) on a film with no music
+    try:
+        from . import beatfit
+        ctx = _beat_context(fid)
+        marks = beatfit.on_beat(ctx["boundaries"], ctx["bpm"], ctx["offset"])
+        verdict["beats"] = {"ok": marks["percent"] >= 75.0, "percent": marks["percent"],
+                            "cuts": f'{marks["on"]}/{marks["of"]}', "bpm": ctx["bpm"],
+                            "offset_source": ctx["offset_source"]}
+    except HTTPException:
+        verdict["beats"] = {"ok": None, "percent": None, "reason": "this film has no music"}
+    return {"video": video.name, **verdict}
 
 
 @router.post("/films/{fid}/drafts")

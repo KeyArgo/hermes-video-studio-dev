@@ -656,6 +656,32 @@
     return box
   }
 
+  // Snapping the cut to the music: the difference between a cut and a slide show with a bed.
+  function fitBeats() {
+    var fid = window.__studioFilm
+    if (!fid) { status('Pick a film first'); return }
+    status('Snapping cuts to the beat…')
+    api('/films/' + encodeURIComponent(fid) + '/fit-to-beats', { method: 'POST', body: JSON.stringify({}) })
+      .then(function (r) {
+        if (!r.applied) { status(r.reason || 'already on the beat'); return }
+        status('On the beat: ' + r.before.percent + '% → ' + r.after.percent + '% · ' +
+               r.moved.length + ' cut(s) moved · re-render needed')
+        var el = document.getElementById('beat-note')
+        if (el) el.textContent = 'on beat ' + r.after.percent + '% (' + r.after.on + '/' + r.after.of +
+          ') at ' + r.bpm + ' bpm'
+      })
+      .catch(function (e) { status('Could not fit: ' + e.message) })
+  }
+
+  function loadBeatNote() {
+    var fid = window.__studioFilm
+    var box = document.getElementById('beat-note')
+    if (!box || !fid) return
+    api('/films/' + encodeURIComponent(fid) + '/beat-grid')
+      .then(function (d) { box.textContent = 'on beat ' + d.percent + '% (' + d.on + '/' + d.of + ') at ' + d.bpm + ' bpm' })
+      .catch(function () { box.textContent = 'no music attached' })
+  }
+
   function loadProduction() {
     var body = $('prod-body'); if (!body) return
     body.innerHTML = ''
@@ -724,6 +750,8 @@
     loadBuildChip()
     loadReviewModels()
     var rv = $('btn-review'); if (rv) rv.addEventListener('click', runReview)
+    var fb = $('btn-fit-beats'); if (fb) fb.addEventListener('click', fitBeats)
+    loadBeatNote()
     var pl = $('player')
     if (pl) pl.addEventListener('timeupdate', function () {
       var at = $('review-at'); if (at) at.textContent = 'at ' + (pl.currentTime || 0).toFixed(1) + 's'

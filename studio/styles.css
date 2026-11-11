@@ -473,3 +473,5 @@ html, body {
 .rec-sheet .cap-rec { border: 0; background: transparent; padding: 0; }
 .rec-sheet .cap-field { flex: 1 1 150px; }
 .rec-sheet .hint { margin: 0 0 12px; }
+
+.beat-note { font-size: 10.5px; margin-top: 2px; }
