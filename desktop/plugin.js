@@ -70,6 +70,24 @@ function Studio({ ctx }) {
 
   useEffect(() => { resolve() }, [resolve])
 
+  // A dead host must not leave a white rectangle in the pane. The host can die (a restart, a
+  // crash, an OOM); the pane holds a stale iframe src and shows nothing. Ask the gateway for the
+  // host again on a slow timer, and remount the frame only when the answer changes.
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!url) return undefined
+    let cancelled = false
+    const id = setInterval(async () => {
+      try {
+        if (!ctx || typeof ctx.rest !== 'function') return
+        const answer = await ctx.rest('/studio/host', { timeoutMs: 45000 })
+        if (!cancelled && answer && answer.url && answer.url !== url) setUrl(answer.url)
+        if (!cancelled && answer && answer.url) setTick(n => n + 1)
+      } catch { /* keep the current frame; the next tick tries again */ }
+    }, 8000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [url, ctx])
+
   const openExternal = () => {
     const bridge = typeof window !== 'undefined' ? window.hermesDesktop : null
     if (bridge && typeof bridge.openExternal === 'function') bridge.openExternal(url)
@@ -90,7 +108,7 @@ function Studio({ ctx }) {
   }
 
   return h('div', { style: wrap }, [
-    h('iframe', { key: 'studio', src: `${url}/`, title: 'Video Studio',
+    h('iframe', { key: `studio-${tick}`, src: `${url}/`, title: 'Video Studio',
       allow: 'autoplay; clipboard-write', style: frame }),
     h('div', { key: 'bar', style: bar }, [
       h('span', { key: 'w', style: { opacity: .6 } }, `${url} · same films the agent edits`),
