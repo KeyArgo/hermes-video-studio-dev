@@ -39,6 +39,26 @@ def _run(cmd) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True)
 
 
+def _filter_path(path: str) -> str:
+    """Escape a filesystem path for use as a value inside an ffmpeg filtergraph.
+
+    ffmpeg's filtergraph parser treats ``:`` as the option separator and ``\\`` as
+    an escape character, so a Windows path like ``C:\\Users\\me\\caps.ass`` handed
+    straight to the ``ass=`` / ``subtitles=`` filter is mis-parsed: the drive-letter
+    colon splits the filter options and the backslash separators are swallowed as
+    escapes, so the caption pass fails (or silently loads the wrong file).
+
+    ffmpeg accepts forward slashes on Windows, so normalise separators and then
+    escape the remaining filtergraph metacharacters (notably the colon) so the
+    whole value is read as one literal filename. On POSIX paths — no backslashes,
+    no colons — this is a no-op, so the same code is correct on CI (Linux).
+    """
+    p = path.replace("\\", "/")
+    for ch in (":", "'", "[", "]", ",", ";"):
+        p = p.replace(ch, "\\" + ch)
+    return p
+
+
 def probe(path: str) -> dict:
     r = _run(["ffprobe", "-v", "error", "-show_streams", "-show_format",
               "-of", "json", path])
@@ -583,7 +603,7 @@ class Project:
                 _write_ass(caps, ass)
                 final = out
                 r = _run(["ffmpeg", "-y", "-v", "error", "-i", stage,
-                          "-vf", f"ass={ass}", "-c:v", "libx264", "-crf", "18",
+                          "-vf", f"ass={_filter_path(ass)}", "-c:v", "libx264", "-crf", "18",
                           "-preset", "medium", "-pix_fmt", "yuv420p",
                           "-c:a", "copy", final])
                 if r.returncode != 0:
