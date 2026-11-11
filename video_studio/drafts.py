@@ -114,6 +114,9 @@ def assemble(clips: list[Path], dest: Path, bed: Path | None = None,
     """
     if not clips:
         raise RuntimeError("no clips to assemble")
+    # ffmpeg writes straight to `dest`, so its directory must exist first; creating
+    # it afterwards (as this did) was dead — the render had already failed.
+    dest.parent.mkdir(parents=True, exist_ok=True)
     args = ["ffmpeg", "-y", "-v", "error"]
     for c in clips:
         args += ["-i", str(c)]
@@ -132,7 +135,6 @@ def assemble(clips: list[Path], dest: Path, bed: Path | None = None,
     r = subprocess.run(args, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"assemble failed: {r.stderr[-400:]}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
     return {"output": str(dest), "bytes": dest.stat().st_size, "width": width, "height": height}
 
 
