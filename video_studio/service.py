@@ -12,6 +12,67 @@ from . import edl, store
 
 MAX_SECONDS = 90.0
 
+PREVIEW_W, PREVIEW_H = 1280, 720
+
+
+def _preview_filtergraph(tl, has_audio):
+    """Build (graph, extra_inputs, maps) for a fast 720p preview.
+
+    Pure string construction — no ffmpeg runs — so it can be unit-tested. It
+    mirrors the delivery render in two ways the old inline builder got wrong:
+
+    * **silent sources**: without an audio track, emitting ``[a{i}]`` labels and
+      ``concat ...:a=1`` references audio pads that are never defined, so the
+      whole preview fails. A silent source now concats ``a=0`` and gets a
+      synthesised ``anullsrc`` track, exactly like ``edl.Project.render``.
+    * **cards**: a card segment is its own PNG input, not a slice of ``[0:v]`` —
+      the old builder trimmed the source footage where the card should be.
+    """
+    graph, labels = [], []
+    cards: dict[str, int] = {}
+    for s in tl:
+        if s.get("kind") == "card":
+            cards.setdefault(s["png"], len(cards) + 1)
+    extra_inputs = []
+    for png in cards:
+        extra_inputs += ["-loop", "1", "-i", png]
+
+    for i, s in enumerate(tl):
+        if s.get("kind") == "card":
+            k = cards[s["png"]]
+            graph.append(
+                f"[{k}:v]scale={PREVIEW_W}:{PREVIEW_H}:force_original_aspect_ratio=decrease,"
+                f"pad={PREVIEW_W}:{PREVIEW_H}:(ow-iw)/2:(oh-ih)/2:color=0x0b0d10,"
+                f"fps={edl.FPS},trim=start={s['src_in']}:end={s['src_out']},"
+                f"setpts=PTS-STARTPTS,setsar=1[v{i}]")
+            if has_audio:
+                graph.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{s['duration']:.3f},"
+                             f"asetpts=PTS-STARTPTS[a{i}]")
+        else:
+            graph.append(
+                f"[0:v]trim=start={s['src_in']}:end={s['src_out']},"
+                f"setpts=(PTS-STARTPTS)/{s['speed']},fps={edl.FPS},"
+                f"scale={PREVIEW_W}:{PREVIEW_H}:force_original_aspect_ratio=decrease,"
+                f"pad={PREVIEW_W}:{PREVIEW_H}:(ow-iw)/2:(oh-ih)/2:color=0x0b0d10,setsar=1[v{i}]")
+            if has_audio:
+                graph.append(
+                    f"[0:a]atrim=start={s['src_in']}:end={s['src_out']},"
+                    f"asetpts=PTS-STARTPTS,{edl._atempo(s['speed'])},"
+                    f"volume={'0' if s.get('muted') else '1'},"
+                    f"aformat=sample_rates=48000:channel_layouts=stereo[a{i}]")
+        labels.append(f"[v{i}][a{i}]" if has_audio else f"[v{i}]")
+
+    n = len(tl)
+    if has_audio:
+        graph.append("".join(labels) + f"concat=n={n}:v=1:a=1[vc][ac]")
+    else:
+        graph.append("".join(labels) + f"concat=n={n}:v=1:a=0[vc]")
+        total = sum(s["duration"] for s in tl)
+        graph.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{total:.3f},"
+                     f"asetpts=PTS-STARTPTS[ac]")
+    maps = ["-map", "[vc]", "-map", "[ac]"]
+    return graph, extra_inputs, maps
+
 
 def snapshot(p: "edl.Project") -> dict:
     tl, caps = p.timeline()
@@ -122,26 +183,11 @@ def render(pid: str, fast: bool = False, max_seconds: float = MAX_SECONDS) -> di
         # A preview only has to be watchable, not shippable: it exists so a person
         # can hear the cut before committing two minutes to a real render.
         tl, caps = p.timeline()
-        graph, labels = [], []
         info = edl.probe(p.source)
-        for i, s in enumerate(tl):
-            graph.append(
-                f"[0:v]trim=start={s['src_in']}:end={s['src_out']},"
-                f"setpts=(PTS-STARTPTS)/{s['speed']},fps={edl.FPS},"
-                f"scale=1280:720:force_original_aspect_ratio=decrease,"
-                f"pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=0x0b0d10,setsar=1[v{i}]")
-            if info["has_audio"]:
-                graph.append(
-                    f"[0:a]atrim=start={s['src_in']}:end={s['src_out']},"
-                    f"asetpts=PTS-STARTPTS,{edl._atempo(s['speed'])},"
-                    f"volume={'0' if s.get('muted') else '1'},"
-                    f"aformat=sample_rates=48000:channel_layouts=stereo[a{i}]")
-            labels.append(f"[v{i}][a{i}]")
-        graph.append("".join(labels) +
-                     f"concat=n={len(tl)}:v=1:a=1[vc][ac]")
-        edl._run(["ffmpeg", "-y", "-v", "error", "-i", p.source,
-                  "-filter_complex", ";".join(graph),
-                  "-map", "[vc]", "-map", "[ac]", "-c:v", "libx264", "-crf", "30",
+        graph, extra_inputs, maps = _preview_filtergraph(tl, info["has_audio"])
+        edl._run(["ffmpeg", "-y", "-v", "error", "-i", p.source, *extra_inputs,
+                  "-filter_complex", ";".join(graph), *maps,
+                  "-c:v", "libx264", "-crf", "30",
                   "-preset", "ultrafast", "-pix_fmt", "yuv420p",
                   "-c:a", "aac", "-b:a", "128k", str(out)])
         check = p.verify(str(out), max_seconds=1e9)
