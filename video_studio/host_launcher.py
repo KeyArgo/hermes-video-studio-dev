@@ -58,7 +58,11 @@ def _interpreter() -> str:
                 return candidate
         except (OSError, subprocess.SubprocessError):
             continue
-    raise RuntimeError("no interpreter with uvicorn + fastapi found for the studio host")
+    raise RuntimeError(
+        "The studio host needs fastapi and uvicorn, and no interpreter on this machine has them.\n"
+        f"Fix: {sys.executable} -m pip install -r requirements.txt\n"
+        "Then reload the plugin pane (Ctrl/⌘+K → Reload desktop plugins)."
+    )
 
 
 def read_state() -> dict:

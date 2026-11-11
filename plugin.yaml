@@ -4,18 +4,21 @@ kind: standalone
 version: "1.0.0"
 manifest_version: 2
 api_version: 1
-author: Hewn
+author: InovinLabs
 license: MIT
 description: >
-  Two rooms, one file format. **Films** builds a video from HyperFrames shot
-  compositions: storyboard cards per shot, edit a shot's HTML in the tab, re-render one
-  shot (31 s for a 7 s shot) or the whole film, with live render progress and the quality
-  gate (hook, motion, legibility) in the panel — a film only ships when all three pass.
-  **Cutting room** is a source clip plus a list of edits: snip, tighten pauses, retime,
-  mute, caption, undo — never a re-encoded pile of files, so undo is free and a re-cut
-  costs seconds. The agent calls the same operations you click. Local rendering, no
-  upload, no account, and no invented numbers: every duration, check and job state comes
-  back from the API.
+  Short product films, made with your agent on your own machine. Seven rooms in one
+  studio: **Films** (player, shots, the quality gate), **Assets** (intake, proxies,
+  stills as moving clips), **Script** (an idea becomes timed beats), **Timeline**
+  (multi-track cut with exact undo), **Generate** (MiniMax H3 on ComfyUI for beats a
+  camera could not shoot), **Music** (a real track from Music Studio as the bed) and
+  **Production** (the checklist, and desktop recording).
+  The parts that make it a tool rather than a prompt box: shots are rendered from typed
+  HyperFrames compositions under a written contract, real footage is captured from the
+  product itself, shot lengths snap to the song's beat grid, and every finished file is
+  **measured** — hook, motion per second, loudness, legibility, and the share of cuts on
+  a beat. A film only ships when those pass, and you can point at any moment and ask a
+  model what should change, using that frame's measurements plus the shot's source.
 requires_hermes: ">=0.23.0"
 tags: [video, editing, media]
 provides_tools:

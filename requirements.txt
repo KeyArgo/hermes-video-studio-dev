@@ -1,0 +1,5 @@
+# Video Studio runtime — the studio host needs these; Hermes itself only imports the plugin.
+fastapi>=0.110
+uvicorn>=0.27
+python-multipart>=0.0.9
+# optional, used by specific features: opentimelineio (interchange), numpy (beat phase)

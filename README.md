@@ -1,8 +1,42 @@
-# Hewn Cut
+# Video Studio
 
-A cutting room the agent can operate. Describe the edit; the agent emits one
-operation; the renderer reports measured facts. The agent never gets to say the
-cut is good.
+Short product films, made with your agent on your own machine. A Hermes desktop plugin: seven
+rooms, one film file, and a finished file that is **measured** before it is allowed to ship.
+
+```
+idea → timed beats → typed shots (HyperFrames) + real footage + generated b-roll
+     → a cut that lands on the music → a measured gate → the film
+```
+
+The claim it makes is narrow and checkable: **the agent cannot say a cut is good.** Every film
+carries numbers taken from the file itself — hook brightness, motion per second, loudness and true
+peak, the smallest type on screen, and the share of cuts that land on a beat. Point at any moment,
+type what feels wrong, and a model gets that frame's measurements plus the shot's own source, then
+names the edit.
+
+## Install
+
+```bash
+hermes plugins install KeyArgo/hermes-video-studio-dev     # add --enable on a fresh profile
+```
+
+Requires **Hermes ≥ 0.23** and **ffmpeg** on `PATH`. The studio host also needs `fastapi` and
+`uvicorn` (`pip install -r requirements.txt`) — if they are missing, the plugin says so and names
+that command instead of failing silently.
+
+Then open the plugin and go to **Production → Install check**. It reports each requirement with the
+command that fixes it:
+
+| Check | Needed for | If missing |
+| :-- | :-- | :-- |
+| `ffmpeg` | every render and the gate | `zypper install ffmpeg` / `apt install ffmpeg` |
+| `fastapi` + `uvicorn` | the studio host (the UI itself) | `pip install -r requirements.txt` |
+| `melt` (MLT) | the multi-track cut | falls back to ffmpeg concat |
+| `node` / `npx` | typed shots via `hyperframes` | `npx hyperframes` renders on demand |
+| `wf-recorder` | recording apps that are not web pages | optional — browser capture needs nothing |
+| `VIDEO_STUDIO_MOTION` | where films and renders live | defaults to `~/Development/hewn-motion` |
+
+Nothing else is required: no account, no upload, no cloud.
 
 ## The problem it solves
 

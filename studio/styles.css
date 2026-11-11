@@ -475,3 +475,12 @@ html, body {
 .rec-sheet .hint { margin: 0 0 12px; }
 
 .beat-note { font-size: 10.5px; margin-top: 2px; }
+
+/* install check: one line per requirement, the fix in place of a shrug */
+.preflight-box { margin: 6px 22px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 10px 12px; }
+.pf-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.pf-head b { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.pf-grid { display: grid; gap: 3px; }
+.pf-row { display: grid; grid-template-columns: 90px 1fr; gap: 10px; font-size: 10.5px; }
+.pf-row.bad .mono-dim { color: var(--amber); }
+.pf-id { font-family: var(--mono); color: var(--dim); }

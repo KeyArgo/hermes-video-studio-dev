@@ -42,6 +42,13 @@ def status():
     return {"ok": True, "plugin": "hewn-video-studio", "workspace": str(MOTION)}
 
 
+@app.get("/api/preflight")
+def preflight():
+    """What this install can do, and the exact command for anything missing."""
+    from video_studio.preflight import check
+    return check()
+
+
 @app.get("/api/version")
 def version():
     """The build behind this page. Same function the dashboard tab and CLI read."""

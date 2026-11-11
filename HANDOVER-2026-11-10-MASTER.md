@@ -14,8 +14,8 @@ nothing, and uses the user's own GPUs.
 
 ```bash
 cd ~/Development/hewn-video-studio && ./scripts/deploy.sh    # copy → stamp → restart host (one command)
-curl -s http://127.0.0.1:36659/api/version | python3 -m json.tool   # the build you are on
-curl -s http://127.0.0.1:36659/api/films | python3 -c "import json,sys;print([f['id'] for f in json.load(sys.stdin)['films']])"
+python3 -c "import json,urllib.request;print(json.dumps(json.load(urllib.request.urlopen('http://127.0.0.1:36659/api/version')),indent=1))"
+python3 -c "import json,urllib.request;print([f['id'] for f in json.load(urllib.request.urlopen('http://127.0.0.1:36659/api/films'))['films']])"
 ```
 
 Then open the studio: **http://127.0.0.1:36659/** (the desktop pane frames the same URL).

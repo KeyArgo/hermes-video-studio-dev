@@ -54,7 +54,7 @@
     if (room === 'assets') loadAssets()
     if (room === 'generate') loadComfy()
     if (room === 'music') loadMusic()
-    if (room === 'production') { loadProduction(); loadCaptureDeps() }
+    if (room === 'production') { loadProduction(); loadCaptureDeps(); loadPreflight() }
     if (room === 'timeline' && window.__studioLoadTimeline) window.__studioLoadTimeline()
   }
 
@@ -680,6 +680,30 @@
     api('/films/' + encodeURIComponent(fid) + '/beat-grid')
       .then(function (d) { box.textContent = 'on beat ' + d.percent + '% (' + d.on + '/' + d.of + ') at ' + d.bpm + ' bpm' })
       .catch(function () { box.textContent = 'no music attached' })
+  }
+
+  // A fresh install should be able to say exactly what it is missing.
+  function loadPreflight() {
+    var box = document.getElementById('preflight-box')
+    if (!box) return
+    api('/preflight').then(function (d) {
+      box.innerHTML = ''
+      var head = el('div', { class: 'pf-head' }, [
+        el('b', { text: 'Install check' }),
+        el('span', { class: d.ok ? 'cap-ok' : 'cap-missing', text: d.ok ? 'ready' : 'missing: ' + (d.blocking || []).join(', ') })
+      ])
+      box.appendChild(head)
+      var grid = el('div', { class: 'pf-grid' })
+      ;(d.rows || []).forEach(function (row) {
+        grid.appendChild(el('div', { class: 'pf-row' + (row.ok ? '' : ' bad') }, [
+          el('span', { class: 'pf-id', text: row.id }),
+          el('span', { class: 'mono-dim', text: row.ok ? row.detail : (row.fix || row.detail) })
+        ]))
+      })
+      box.appendChild(grid)
+    }).catch(function (e) {
+      box.textContent = 'install check failed: ' + e.message
+    })
   }
 
   function loadProduction() {

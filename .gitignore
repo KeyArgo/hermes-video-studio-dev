@@ -6,3 +6,5 @@ renders/
 takes/
 .hyperframes/
 BUILD_INFO.json
+.hermes/
+**/__pycache__/
