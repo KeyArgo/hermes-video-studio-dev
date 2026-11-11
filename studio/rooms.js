@@ -684,6 +684,19 @@
 
   // A fresh install should be able to say exactly what it is missing.
   // A render must be visible and stoppable from the page that started it.
+  // One control that stops everything this studio is doing, from anywhere in the app.
+  function stopEverything() {
+    if (!window.confirm('Stop every render and recording Video Studio is running?')) return
+    status('Stopping everything…')
+    api('/stop-all', { method: 'POST', body: '{}' })
+      .then(function (r) {
+        var n = (r.stopped_jobs || []).length
+        status(n ? 'Stopped ' + n + ' render(s); nothing is running now' : 'Nothing was running')
+        pollJobs()
+      })
+      .catch(function (e) { status('Stop failed: ' + e.message) })
+  }
+
   function pollJobs() {
     api('/jobs').then(function (d) {
       var n = (d.jobs || []).filter(function (j) { return j.alive }).length
@@ -798,6 +811,7 @@
     var rv = $('btn-review'); if (rv) rv.addEventListener('click', runReview)
     var fb = $('btn-fit-beats'); if (fb) fb.addEventListener('click', fitBeats)
     loadBeatNote()
+    var killAll = $('btn-stop-all'); if (killAll) killAll.addEventListener('click', stopEverything)
     pollJobs(); setInterval(pollJobs, 4000)
     var pl = $('player')
     if (pl) pl.addEventListener('timeupdate', function () {

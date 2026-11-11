@@ -347,6 +347,44 @@ def render_shot(fid: str, bid: str):
     return {"job": jid, "output": out}
 
 
+@router.post("/stop-all")
+def stop_all(body: dict | None = None):
+    """Stop everything this studio is doing, with no leftovers.
+
+    One button for "I am done / I do not want this running": every tracked render is killed at its
+    process group, an in-flight recording is finalised, and the in-memory job list is marked
+    stopped. With `close_host: true` the studio then exits — which is the only way to guarantee
+    that nothing of ours is still holding a core.
+    """
+    from . import jobs
+    from .recorder import status as rec_status, stop as rec_stop
+
+    stopped_jobs = jobs.reap_all(wait=4.0)
+    recorder = None
+    try:
+        if rec_status().get("recording"):
+            recorder = rec_stop()
+    except Exception as exc:                     # a broken recorder must not block the stop
+        recorder = {"ok": False, "reason": str(exc)}
+    with _lock:
+        for j in _jobs.values():
+            if j.get("state") == "running":
+                j["state"] = "stopped"
+    out = {"ok": True, "stopped_jobs": stopped_jobs["stopped"],
+           "already_gone": stopped_jobs["already_gone"], "recorder": recorder,
+           "active_now": jobs.idle_report()["active_jobs"]}
+    if (body or {}).get("close_host"):
+        import threading
+        try:
+            from .studio_host import _write_state_gone
+            _write_state_gone()
+        except Exception:
+            pass
+        threading.Timer(0.4, lambda: os._exit(0)).start()
+        out["host"] = "closing"
+    return out
+
+
 @router.get("/jobs")
 def jobs_active():
     """What this studio is rendering right now — with a measured CPU figure per process."""
