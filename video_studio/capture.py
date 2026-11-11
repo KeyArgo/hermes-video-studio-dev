@@ -204,11 +204,16 @@ def install_desktop_recorder(use_prompt: bool = False) -> dict:
         attempts.append(["sudo", "-n", "sh", "-c", command.replace("sudo ", "", 1)])
     if use_prompt and info["desktop"]["can_install_with_prompt"]:
         attempts.append(["pkexec", "sh", "-c", command.replace("sudo ", "", 1)])
+    # Record results in a SEPARATE list: mutating `attempts` in place replaced the
+    # element the loop was about to visit next, feeding a dict into subprocess.run
+    # (a TypeError) whenever both a quiet and a prompted attempt were queued.
+    results = []
     for cmd in attempts:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        attempts[-1] = {"cmd": " ".join(cmd[:3]), "rc": r.returncode, "tail": (r.stdout + r.stderr)[-300:]}
+        results.append({"cmd": " ".join(cmd[:3]), "rc": r.returncode,
+                        "tail": (r.stdout + r.stderr)[-300:]})
         if r.returncode == 0 and shutil.which("wf-recorder"):
             return {"ok": True, "installed": True, "command": command}
-    return {"ok": False, "attempted": attempts,
+    return {"ok": False, "attempted": results,
             "needs": "run this in a terminal: " + command,
             "hint": "the studio cannot elevate itself; a password prompt or a terminal is required"}
