@@ -138,6 +138,27 @@ def transform_captions(caps, kind, rng=None, factor=None):
             out.append(mk(c["start"], c["end"], c["text"]))
         return out
 
+    if kind == "insert":
+        # A card (or any segment) of length d is wedged in at timeline second a.
+        # Everything at or after a slides right by d; a caption that straddles the
+        # insertion point keeps its head and the tail moves with its material.
+        a, b = rng
+        d = b - a
+        for c in caps:
+            s, e, t = c["start"], c["end"], c["text"]
+            if e <= a:
+                r = keep(s, e, t)
+                if r: out.append(r)
+            elif s >= a:
+                r = keep(s + d, e + d, t)
+                if r: out.append(r)
+            else:
+                r1 = keep(s, a, t)
+                if r1: out.append(r1)
+                r2 = keep(a + d, e + d, t)
+                if r2: out.append(r2)
+        return out
+
     if kind == "snip":
         a, b = rng
         d = b - a
@@ -504,9 +525,14 @@ class Project:
                 d = float(entry["seconds"])
                 card = {"kind": "card", "png": entry["png"],
                         "src_in": 0.0, "src_out": d, "speed": 1.0, "muted": True}
-                at = sum(_tlen(s) for s in segs) if entry.get("at") is None \
-                    else float(entry["at"])
+                now = sum(_tlen(s) for s in segs)
+                at = now if entry.get("at") is None else float(entry["at"])
+                at = max(0.0, min(at, now))      # same clamp _insert_card applies
                 segs = _insert_card(segs, at, card)
+                # The card pushes everything at/after `at` right by its duration;
+                # captions must move with the material they annotate, or they drift
+                # onto earlier footage (a card at the end shifts nothing).
+                caps = transform_captions(caps, "insert", (at, at + d))
             else:
                 raise ValueError(f"unknown op {kind!r}")
 
